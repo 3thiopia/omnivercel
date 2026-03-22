@@ -33,7 +33,7 @@ export const CategoryBar = ({ selectedId, onSelect }: CategoryBarProps) => {
       return;
     }
 
-    const current = categories.find(c => String(c.id) === String(selectedId));
+    const current = categories.find(c => c.id && String(c.id) === String(selectedId));
     if (current) {
       if (current.parent_id) {
         setSelectedParentId(String(current.parent_id));
@@ -67,10 +67,10 @@ export const CategoryBar = ({ selectedId, onSelect }: CategoryBarProps) => {
     <div className="space-y-4">
       <div className="py-2 overflow-x-auto no-scrollbar -mx-4 px-4">
         <div className="flex gap-5 min-w-max">
-          {mainCategories.map((cat) => (
+          {mainCategories.map((cat, idx) => (
             <button
-              key={cat.id}
-              onClick={() => onSelect(cat.id)}
+              key={cat.id || idx}
+              onClick={() => cat.id && onSelect(cat.id)}
               className="flex flex-col items-center gap-2 group cursor-pointer shrink-0 relative"
             >
               <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 shadow-sm text-xl relative ${
@@ -121,10 +121,10 @@ export const CategoryBar = ({ selectedId, onSelect }: CategoryBarProps) => {
               All {mainCategories.find(c => String(c.id) === selectedParentId)?.name}
               {selectedId === selectedParentId && <X className="w-3 h-3" />}
             </button>
-            {subCategories.map((sub) => (
+            {subCategories.map((sub, idx) => (
               <button
-                key={sub.id}
-                onClick={() => onSelect(sub.id)}
+                key={sub.id || idx}
+                onClick={() => sub.id && onSelect(sub.id)}
                 className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border shadow-sm shrink-0 flex items-center gap-2 ${
                   selectedId === sub.id
                     ? 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/20'

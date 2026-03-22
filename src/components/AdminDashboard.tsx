@@ -156,29 +156,33 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
       const token = session.access_token;
 
       if (action === 'unlist') {
-        await api.listings.update(report.listing_id, { status: 'hidden' }, token);
-        await api.reports.updateStatus(report.id, 'resolved', token);
-        toast.success('Listing unlisted and report resolved');
+        if (report.listing_id) {
+          await api.listings.update(report.listing_id, { status: 'hidden' }, token);
+          await api.reports.updateStatus(report.id, 'resolved', token);
+          toast.success('Listing unlisted and report resolved');
+        }
       } else if (action === 'delete') {
-        setConfirmModal({
-          isOpen: true,
-          title: 'Delete Listing',
-          message: 'Are you sure you want to delete this listing? This will also resolve the report.',
-          type: 'danger',
-          onConfirm: async () => {
-            try {
-              await api.listings.delete(report.listing_id, token);
-              await api.reports.updateStatus(report.id, 'resolved', token);
-              toast.success('Listing deleted and report resolved');
-              fetchReports();
-              fetchListings();
-            } catch (error) {
-              console.error('Error deleting listing from report:', error);
-              toast.error('Failed to delete listing');
+        if (report.listing_id) {
+          setConfirmModal({
+            isOpen: true,
+            title: 'Delete Listing',
+            message: 'Are you sure you want to delete this listing? This will also resolve the report.',
+            type: 'danger',
+            onConfirm: async () => {
+              try {
+                await api.listings.delete(report.listing_id, token);
+                await api.reports.updateStatus(report.id, 'resolved', token);
+                toast.success('Listing deleted and report resolved');
+                fetchReports();
+                fetchListings();
+              } catch (error) {
+                console.error('Error deleting listing from report:', error);
+                toast.error('Failed to delete listing');
+              }
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
             }
-            setConfirmModal(prev => ({ ...prev, isOpen: false }));
-          }
-        });
+          });
+        }
         return; // Modal handles the rest
       } else if (action === 'ban') {
         const sellerId = report.listing?.seller_id;
@@ -1016,8 +1020,8 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                         className="flex-1 px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 border-none bg-white rounded-xl font-bold text-gray-600 appearance-none cursor-pointer outline-none transition-all shadow-sm"
                       >
                         <option value="">Main Category</option>
-                        {categories.filter(c => !c.parent_id).map(c => (
-                          <option key={c.id} value={c.id}>Parent: {c.name}</option>
+                        {categories.filter(c => !c.parent_id).map((c, idx) => (
+                          <option key={c.id || idx} value={c.id}>Parent: {c.name}</option>
                         ))}
                       </select>
                       <button 
@@ -1091,8 +1095,8 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                                   className="w-full px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 border border-gray-100 bg-gray-50/50 rounded-xl font-bold text-gray-600 appearance-none cursor-pointer outline-none transition-all"
                                 >
                                   <option value="">Main Category</option>
-                                  {categories.filter(c => !c.parent_id && c.id !== editingCategory.id).map(c => (
-                                    <option key={c.id} value={c.id}>Parent: {c.name}</option>
+                                  {categories.filter(c => !c.parent_id && c.id !== editingCategory.id).map((c, idx) => (
+                                    <option key={c.id || idx} value={c.id}>Parent: {c.name}</option>
                                   ))}
                                 </select>
                               </div>

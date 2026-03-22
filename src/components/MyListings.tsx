@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Package, Trash2, ExternalLink, CheckCircle2, RefreshCw, AlertCircle, Edit3, User, Heart } from 'lucide-react';
+import { Package, Trash2, ExternalLink, CheckCircle2, RefreshCw, AlertCircle, Edit3, User, Heart, Star, MessageSquare, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
-import { Listing } from '../types';
+import { Listing, Review } from '../types';
 import { api } from '../services/api';
 import { supabase } from '../lib/supabase';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
@@ -20,7 +20,8 @@ interface MyListingsProps {
 export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsProps) => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [favorites, setFavorites] = useState<Listing[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'my-items' | 'favorites'>('my-items');
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [activeSubTab, setActiveSubTab] = useState<'my-items' | 'favorites' | 'reviews'>('my-items');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
@@ -69,13 +70,78 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
     }
   }, []);
 
+  const fetchReviews = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        setError('You must be logged in to view your reviews.');
+        return;
+      }
+
+      const data = await api.reviews.getForSeller(session.user.id);
+      setReviews(data);
+    } catch (err) {
+      console.error('Error fetching reviews:', err);
+      setError('Failed to load your reviews. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleLikeReview = async (reviewId: string, currentLiked: boolean) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      await api.reviews.update(reviewId, { seller_liked: !currentLiked }, session.access_token);
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, seller_liked: !currentLiked } : r));
+      toast.success(!currentLiked ? 'Review liked!' : 'Review unliked');
+    } catch (err) {
+      console.error('Error liking review:', err);
+      toast.error('Failed to update review');
+    }
+  };
+
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+
+  const handleReplySubmit = async (reviewId: string) => {
+    if (!replyText.trim()) return;
+    setIsSubmittingReply(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const now = new Date().toISOString();
+      await api.reviews.update(reviewId, { 
+        seller_reply: replyText,
+        replied_at: now
+      }, session.access_token);
+
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, seller_reply: replyText, replied_at: now } : r));
+      toast.success('Reply posted!');
+      setReplyingTo(null);
+      setReplyText('');
+    } catch (err) {
+      console.error('Error replying to review:', err);
+      toast.error('Failed to post reply');
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
   useEffect(() => {
     if (activeSubTab === 'my-items') {
       fetchMyListings();
-    } else {
+    } else if (activeSubTab === 'favorites') {
       fetchFavorites();
+    } else {
+      fetchReviews();
     }
-  }, [activeSubTab, fetchMyListings, fetchFavorites]);
+  }, [activeSubTab, fetchMyListings, fetchFavorites, fetchReviews]);
 
   const handleToggleFavorite = async (listingId: string | number) => {
     try {
@@ -199,6 +265,13 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
           <Heart className="w-4 h-4" />
           My Favourites
         </button>
+        <button
+          onClick={() => setActiveSubTab('reviews')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${activeSubTab === 'reviews' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
+        >
+          <Star className="w-4 h-4" />
+          My Reviews
+        </button>
       </div>
 
       {activeSubTab === 'my-items' ? (
@@ -296,7 +369,7 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
             </AnimatePresence>
           </div>
         )
-      ) : (
+      ) : activeSubTab === 'favorites' ? (
         favorites.length === 0 ? (
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-12 text-center space-y-4">
             <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto">
@@ -323,6 +396,162 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
                   onClick={() => onViewProduct(listing)}
                   onFavorite={() => handleToggleFavorite(listing.id)}
                 />
+              ))}
+            </AnimatePresence>
+          </div>
+        )
+      ) : (
+        reviews.length === 0 ? (
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-12 text-center space-y-4">
+            <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto">
+              <Star className="w-10 h-10 text-gray-300" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900">No reviews yet</h3>
+            <p className="text-gray-500 max-w-xs mx-auto">Feedback from your buyers will appear here.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            <AnimatePresence mode="popLayout">
+              {reviews.map((review) => (
+                <motion.div 
+                  key={review.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100">
+                        {review.reviewer?.avatar_url ? (
+                          <img 
+                            src={getOptimizedImageUrl(review.reviewer.avatar_url, { width: 100, height: 100 })} 
+                            alt={review.reviewer.full_name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <User className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-sm">{review.reviewer?.full_name}</h4>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </p>
+                          {review.listing && (
+                            <>
+                              <span className="text-[10px] text-gray-200">•</span>
+                              <div className="flex items-center gap-1.5 group cursor-pointer">
+                                <div className="w-4 h-4 rounded-md overflow-hidden bg-gray-50 border border-gray-100">
+                                  <img 
+                                    src={getOptimizedImageUrl(review.listing.thumbnail_url || '', { width: 40, height: 40 })} 
+                                    alt={review.listing.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <span className="text-[10px] text-gray-500 font-bold truncate max-w-[100px] group-hover:text-emerald-600 transition-colors">
+                                  {review.listing.title}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          className={`w-4 h-4 ${star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {review.comment && (
+                    <div className="bg-gray-50 rounded-xl p-4 relative">
+                      <MessageSquare className="w-4 h-4 text-gray-200 absolute top-2 right-2" />
+                      <p className="text-sm text-gray-600 font-medium leading-relaxed italic">
+                        "{review.comment}"
+                      </p>
+                    </div>
+                  )}
+
+                  {review.seller_reply && (
+                    <div className="ml-8 bg-emerald-50/50 border-l-4 border-emerald-500 rounded-r-xl p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center">
+                          <User className="w-3 h-3 text-white" />
+                        </div>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Your Reply</span>
+                        <span className="text-[10px] text-emerald-400 font-medium ml-auto">
+                          {review.replied_at ? new Date(review.replied_at).toLocaleDateString() : ''}
+                        </span>
+                      </div>
+                      <p className="text-sm text-emerald-800 font-medium leading-relaxed">
+                        {review.seller_reply}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 pt-2">
+                    <button 
+                      onClick={() => handleLikeReview(review.id, !!review.seller_liked)}
+                      className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                        review.seller_liked ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-500'
+                      }`}
+                    >
+                      <Heart className={`w-4 h-4 ${review.seller_liked ? 'fill-emerald-600' : ''}`} />
+                      {review.seller_liked ? 'Liked' : 'Like Review'}
+                    </button>
+                    
+                    {!review.seller_reply && replyingTo !== review.id && (
+                      <button 
+                        onClick={() => {
+                          setReplyingTo(review.id);
+                          setReplyText('');
+                        }}
+                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-emerald-500 transition-all"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Reply
+                      </button>
+                    )}
+                  </div>
+
+                  {replyingTo === review.id && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-3 pt-2"
+                    >
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Write your reply..."
+                        className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none min-h-[100px] resize-none"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setReplyingTo(null)}
+                          className="px-4 py-2 rounded-xl text-[10px] font-black uppercase text-gray-400 hover:bg-gray-100 transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleReplySubmit(review.id)}
+                          disabled={isSubmittingReply || !replyText.trim()}
+                          className="bg-emerald-500 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {isSubmittingReply ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Post Reply'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </motion.div>
               ))}
             </AnimatePresence>
           </div>

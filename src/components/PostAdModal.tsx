@@ -76,7 +76,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         // Handle category hierarchy for editing
         if (editListing.category_id && categories.length > 0) {
           const catId = String(editListing.category_id);
-          const currentCat = categories.find(c => String(c.id) === catId);
+          const currentCat = categories.find(c => c.id && String(c.id) === catId);
           
           if (currentCat) {
             if (currentCat.parent_id) {
@@ -402,8 +402,8 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                         disabled={categoriesLoading}
                       >
                         <option value="">{categoriesLoading ? 'Loading categories...' : 'Select Main Category'}</option>
-                        {categories.filter(c => !c.parent_id).map((cat) => (
-                          <option key={cat.id} value={cat.id}>
+                        {categories.filter(c => !c.parent_id).map((cat, idx) => (
+                          <option key={cat.id || idx} value={cat.id}>
                             {cat.icon} {cat.name}
                           </option>
                         ))}
@@ -434,8 +434,8 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                             <option value="">Select Sub-Category</option>
                             {categories
                               .filter(c => String(c.parent_id) === selectedMainCategory)
-                              .map((sub) => (
-                                <option key={sub.id} value={sub.id}>
+                              .map((sub, idx) => (
+                                <option key={sub.id || idx} value={sub.id}>
                                   {sub.icon} {sub.name}
                                 </option>
                               ))}

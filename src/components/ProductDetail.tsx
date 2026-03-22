@@ -139,13 +139,18 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         return;
       }
 
+      if (!product?.id || !product?.seller_id) {
+        toast.error('Product information is missing.');
+        return;
+      }
+
       if (product.seller_id === session.user.id) {
         toast.error("You can't chat with yourself!");
         return;
       }
 
       const conversation = await api.chats.createConversation(product.id, product.seller_id as string, session.access_token);
-      if (conversation) {
+      if (conversation?.id) {
         if (onStartChat) {
           onStartChat(conversation.id);
         } else {
@@ -180,7 +185,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       }
 
       await api.reports.create({
-        listing_id: product.id,
+        listing_id: product?.id || '',
         reason: reportReason,
         details: reportDetails
       }, session.access_token);
@@ -212,8 +217,8 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       }
 
       const newReview = await api.reviews.create({
-        seller_id: product.seller_id as string,
-        listing_id: product.id,
+        seller_id: product?.seller_id as string,
+        listing_id: product?.id || '',
         rating: newRating,
         comment: newComment
       }, session.access_token);
@@ -496,8 +501,8 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                   <p className="text-gray-500 text-sm">Loading reviews...</p>
                 </div>
               ) : reviews.length > 0 ? (
-                reviews.map((review) => (
-                  <div key={review.id} className="bg-white border border-gray-100 rounded-3xl p-6 space-y-3">
+                reviews.map((review, idx) => (
+                  <div key={review.id || idx} className="bg-white border border-gray-100 rounded-3xl p-6 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
@@ -527,6 +532,27 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                       <p className="text-gray-600 font-medium leading-relaxed">
                         {review.comment}
                       </p>
+                    )}
+
+                    {review.seller_reply && (
+                      <div className="ml-6 mt-4 bg-emerald-50/50 border-l-4 border-emerald-500 rounded-r-2xl p-4 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center">
+                            <User className="w-3 h-3 text-white" />
+                          </div>
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Seller's Reply</span>
+                        </div>
+                        <p className="text-sm text-emerald-800 font-medium leading-relaxed">
+                          {review.seller_reply}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {review.seller_liked && (
+                      <div className="flex items-center gap-1.5 mt-2 text-emerald-600">
+                        <Heart className="w-3 h-3 fill-emerald-600" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Seller liked this</span>
+                      </div>
                     )}
                   </div>
                 ))
@@ -575,7 +601,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                     Edit Listing
                   </button>
                   <button 
-                    onClick={() => onDelete?.(product.id)}
+                    onClick={() => onDelete?.(product?.id || '')}
                     className="w-full bg-red-50 text-red-500 border-2 border-red-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-all"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -717,9 +743,9 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           </div>
         ) : relatedItems.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
-            {displayedRelated.map((item) => (
+            {displayedRelated.map((item, idx) => (
               <ListingCard
-                key={item.id}
+                key={item.id || idx}
                 {...item}
                 viewMode="grid"
                 onClick={() => {
@@ -741,7 +767,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         title={product.title}
-        url={`${window.location.origin}?listing=${product.id}`}
+        url={`${window.location.origin}?listing=${product?.id || ''}`}
       />
     </motion.div>
   );

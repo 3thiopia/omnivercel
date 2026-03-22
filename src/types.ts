@@ -33,3 +33,26 @@ export interface User {
   joinedAt: string;
   status: 'active' | 'banned' | 'suspended';
 }
+
+export interface Review {
+  id: string;
+  reviewer_id: string;
+  seller_id: string;
+  listing_id?: string;
+  rating: number;
+  comment?: string;
+  seller_reply?: string;
+  seller_liked?: boolean;
+  replied_at?: string;
+  created_at: string;
+  reviewer?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+  };
+  listing?: {
+    id: string;
+    title: string;
+    thumbnail_url?: string;
+  };
+}

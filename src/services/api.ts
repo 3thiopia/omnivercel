@@ -60,11 +60,19 @@ export interface Review {
   listing_id?: string;
   rating: number;
   comment?: string;
+  seller_reply?: string;
+  seller_liked?: boolean;
+  replied_at?: string;
   created_at: string;
   reviewer?: {
     id: string;
     full_name: string;
     avatar_url?: string;
+  };
+  listing?: {
+    id: string;
+    title: string;
+    thumbnail_url?: string;
   };
 }
 
@@ -163,16 +171,42 @@ export const api = {
           profiles(full_name)
         `);
 
+      // 1. Status Filter
+      if (params?.status === 'all') {
+        // Show all statuses (for admin/my items)
+      } else if (params?.status) {
+        query = query.eq('status', params.status);
+      } else {
+        // Default to active for main page
+        query = query.eq('status', 'active');
+      }
+
+      // 2. Search Filter
       if (params?.search) {
         query = query.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
       }
-      if (params?.category) query = query.eq('category_id', params.category);
-      if (params?.status) query = query.eq('status', params.status);
+      
+      // 3. Category Filter
+      if (params?.category) {
+        // Get all categories to find sub-categories
+        const { data: allCategories } = await supabase.from('categories').select('id, parent_id');
+        const categoriesList = allCategories || [];
+        
+        const subCategoryIds = categoriesList
+          .filter(c => c.parent_id === params.category)
+          .map(c => c.id);
+        
+        const categoryIds = [params.category, ...subCategoryIds];
+        query = query.in('category_id', categoryIds);
+      }
+
+      // 4. Other Filters
       if (params?.seller_id) query = query.eq('seller_id', params.seller_id);
       if (params?.min_price) query = query.gte('price', params.min_price);
       if (params?.max_price) query = query.lte('price', params.max_price);
       if (params?.location) query = query.ilike('location', `%${params.location}%`);
       
+      // 5. Sorting
       if (params?.sort) {
         query = query.order(params.sort, { ascending: params.order === 'asc' });
       } else {
@@ -483,9 +517,9 @@ export const api = {
         .from('conversations')
         .select(`
           *,
-          listing:listings(title, thumbnail_url),
-          buyer:profiles!conversations_buyer_id_fkey(full_name, avatar_url),
-          seller:profiles!conversations_seller_id_fkey(full_name, avatar_url),
+          listing:listings(id, title, thumbnail_url),
+          buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url),
+          seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url),
           messages(content, created_at, sender_id, is_read)
         `)
         .or(`buyer_id.eq.${session.user.id},seller_id.eq.${session.user.id}`)
@@ -495,17 +529,29 @@ export const api = {
 
       return (data as any[]).map(conv => {
         const otherUser = conv.buyer_id === session.user.id ? conv.seller : conv.buyer;
-        const lastMessage = conv.messages?.[0];
-        const unreadCount = conv.messages?.filter((m: any) => !m.is_read && m.sender_id !== session.user.id).length || 0;
+        const lastMessage = conv.messages?.sort((a: any, b: any) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
+        
+        const buyerUnread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id === conv.seller_id).length || 0;
+        const sellerUnread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id === conv.buyer_id).length || 0;
 
         return {
           id: conv.id,
           listing_id: conv.listing_id,
-          listing: conv.listing,
+          listing: {
+            id: conv.listing?.id,
+            title: conv.listing?.title,
+            image: conv.listing?.thumbnail_url
+          },
           other_user: otherUser,
+          seller: conv.seller,
+          buyer: conv.buyer,
           last_message: lastMessage?.content,
           last_message_at: conv.last_message_at,
-          unread_count: unreadCount
+          buyer_unread_count: buyerUnread,
+          seller_unread_count: sellerUnread,
+          unread_count: conv.buyer_id === session.user.id ? buyerUnread : sellerUnread
         };
       });
     },
@@ -637,7 +683,8 @@ export const api = {
         .from('reviews')
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(id, full_name, avatar_url)
+          reviewer:profiles!reviews_reviewer_id_fkey(id, full_name, avatar_url),
+          listing:listings(id, title, thumbnail_url)
         `)
         .eq('seller_id', sellerId)
         .order('created_at', { ascending: false });
@@ -655,6 +702,17 @@ export const api = {
           ...review,
           reviewer_id: session.user.id
         }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Review;
+    },
+    update: async (id: string, updates: { seller_reply?: string; seller_liked?: boolean; replied_at?: string }, _token: string): Promise<Review> => {
+      const { data, error } = await supabase
+        .from('reviews')
+        .update(updates)
+        .eq('id', id)
         .select()
         .single();
 

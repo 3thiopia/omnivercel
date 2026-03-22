@@ -128,7 +128,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
   };
 
   useEffect(() => {
-    if (!selectedConversation) return;
+    if (!selectedConversation?.id) return;
 
     // Subscribe to new messages for this conversation
     const channel = supabase
@@ -198,7 +198,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation || !currentUserId) return;
+    if (!newMessage.trim() || !selectedConversation?.id || !currentUserId) return;
 
     const content = newMessage.trim();
     setNewMessage('');
@@ -256,12 +256,14 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
               <p className="text-gray-400 text-sm font-medium">No messages yet</p>
             </div>
           ) : (
-            filteredConversations.map((conv) => (
+            filteredConversations.map((conv, idx) => (
               <button
-                key={conv.id}
+                key={conv.id || idx}
                 onClick={() => {
-                  setSelectedConversation(conv);
-                  fetchMessages(conv.id);
+                  if (conv.id) {
+                    setSelectedConversation(conv);
+                    fetchMessages(conv.id);
+                  }
                 }}
                 className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-all border-b border-gray-50 ${selectedConversation?.id === conv.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-500' : ''}`}
               >
@@ -276,15 +278,15 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                     )}
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-white p-0.5 shadow-sm">
-                    <img src={getOptimizedImageUrl(conv.listing.image, { width: 50, height: 50 })} alt="" className="w-full h-full rounded-md object-cover" />
+                    <img src={getOptimizedImageUrl(conv.listing?.image, { width: 50, height: 50 })} alt="" className="w-full h-full rounded-md object-cover" />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex justify-between items-start mb-0.5">
                     <div className="flex items-center gap-2 min-w-0">
-                      <h4 className="font-bold text-gray-900 truncate">{conv.other_user.full_name}</h4>
-                      {((currentUserId === conv.seller.id && conv.seller_unread_count > 0) || 
-                        (currentUserId !== conv.seller.id && conv.buyer_unread_count > 0)) && (
+                      <h4 className="font-bold text-gray-900 truncate">{conv.other_user?.full_name || 'User'}</h4>
+                      {((currentUserId === conv.seller?.id && conv.seller_unread_count > 0) || 
+                        (currentUserId !== conv.seller?.id && conv.buyer_unread_count > 0)) && (
                         <span className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0 animate-pulse"></span>
                       )}
                     </div>
@@ -292,7 +294,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                       {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider truncate mb-1">{conv.listing.title}</p>
+                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider truncate mb-1">{conv.listing?.title || 'Unknown Listing'}</p>
                   <p className="text-xs text-gray-500 truncate">{conv.last_message || 'Start a conversation'}</p>
                 </div>
               </button>
@@ -318,7 +320,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                 <div className="flex items-center -space-x-3">
                   {/* Other User Avatar */}
                   <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-white overflow-hidden z-10 shadow-sm">
-                    {selectedConversation.other_user.avatar_url ? (
+                    {selectedConversation.other_user?.avatar_url ? (
                       <img src={getOptimizedImageUrl(selectedConversation.other_user.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -327,9 +329,9 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                     )}
                   </div>
                   {/* Seller Avatar (if different from other_user) */}
-                  {selectedConversation.seller.id !== selectedConversation.other_user.id && (
+                  {selectedConversation.seller?.id !== selectedConversation.other_user?.id && (
                     <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-white overflow-hidden z-0 shadow-sm">
-                      {selectedConversation.seller.avatar_url ? (
+                      {selectedConversation.seller?.avatar_url ? (
                         <img src={getOptimizedImageUrl(selectedConversation.seller.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -342,12 +344,12 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
 
                 <div>
                   <h3 className="font-bold text-gray-900 leading-tight flex items-center gap-1">
-                    <span>{selectedConversation.other_user.full_name}</span>
-                    {selectedConversation.seller.id !== selectedConversation.other_user.id && (
-                      <span className="text-gray-400 font-normal text-xs">& {selectedConversation.seller.full_name}</span>
+                    <span>{selectedConversation.other_user?.full_name || 'User'}</span>
+                    {selectedConversation.seller?.id !== selectedConversation.other_user?.id && (
+                      <span className="text-gray-400 font-normal text-xs">& {selectedConversation.seller?.full_name}</span>
                     )}
                   </h3>
-                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider">{selectedConversation.listing.title}</p>
+                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider">{selectedConversation.listing?.title || 'Unknown Listing'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
