@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ETHIOPIAN_LOCATIONS } from './constants/locations';
 import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin } from 'lucide-react';
 import { supabase } from './lib/supabase';
+import { getOptimizedImageUrl } from './lib/imageUtils';
 
 export default function App() {
   const [isPostAdOpen, setIsPostAdOpen] = useState(false);
@@ -370,11 +371,21 @@ export default function App() {
               
               {user ? (
                 <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="hidden sm:flex items-center gap-2 text-gray-600 font-medium">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm truncate max-w-[100px]">{user.email}</span>
+                  <div 
+                    onClick={() => setActiveTab('profile')}
+                    className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center cursor-pointer hover:border-emerald-500 transition-all"
+                    title={userProfile?.full_name || user.email}
+                  >
+                    {userProfile?.avatar_url ? (
+                      <img 
+                        src={getOptimizedImageUrl(userProfile.avatar_url, { width: 80, height: 80 })} 
+                        alt={userProfile.full_name || 'User'} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <User className="w-5 h-5 text-gray-400" />
+                    )}
                   </div>
                   <button 
                     onClick={handleLogout}
@@ -741,6 +752,7 @@ export default function App() {
       <BottomNav 
         activeTab={activeTab}
         unreadCount={unreadCount}
+        userProfile={userProfile}
         onHome={() => {
           setActiveTab('home');
           setSelectedProduct(null);

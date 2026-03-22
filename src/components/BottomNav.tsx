@@ -1,5 +1,6 @@
 import { Home, Package, PlusCircle, User, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getOptimizedImageUrl } from '../lib/imageUtils';
 
 interface BottomNavProps {
   onHome: () => void;
@@ -9,9 +10,10 @@ interface BottomNavProps {
   onMessages: () => void;
   activeTab: 'home' | 'items' | 'sell' | 'profile' | 'messages';
   unreadCount?: number;
+  userProfile?: any;
 }
 
-export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, activeTab, unreadCount = 0 }: BottomNavProps) => {
+export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, activeTab, unreadCount = 0, userProfile }: BottomNavProps) => {
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 z-[60] flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
       <button 
@@ -63,7 +65,18 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
         onClick={onProfile}
         className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-emerald-500' : 'text-gray-400'}`}
       >
-        <User className="w-6 h-6" />
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center overflow-hidden border transition-all ${activeTab === 'profile' ? 'border-emerald-500' : 'border-gray-200'}`}>
+          {userProfile?.avatar_url ? (
+            <img 
+              src={getOptimizedImageUrl(userProfile.avatar_url, { width: 40, height: 40 })} 
+              alt={userProfile.full_name || 'Profile'} 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <User className="w-4 h-4" />
+          )}
+        </div>
         <span className="text-[10px] font-bold uppercase tracking-tighter">Account</span>
       </button>
     </div>
