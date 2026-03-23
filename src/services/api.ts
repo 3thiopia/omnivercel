@@ -83,14 +83,54 @@ export const api = {
     getAll: async (): Promise<Category[]> => {
       if (categoriesCache) return categoriesCache;
       
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select(`
+            *,
+            listings(count)
+          `);
+          
+        if (error) throw error;
+
+        // 1. Map initial data with direct counts
+        const mappedData = (data as any[]).map(cat => ({
+          ...cat,
+          directCount: cat.listings?.[0]?.count || 0,
+          count: cat.listings?.[0]?.count || 0
+        }));
+
+        // 2. Calculate aggregate counts for parents
+        const finalData = mappedData.map(cat => {
+          if (!cat.parent_id) {
+            const childrenDirectCount = mappedData
+              .filter(child => child.parent_id === cat.id)
+              .reduce((sum, child) => sum + child.directCount, 0);
+            
+            return {
+              ...cat,
+              count: cat.directCount + childrenDirectCount
+            };
+          }
+          return cat;
+        });
+
+        // 3. Sort by count descending
+        const sortedData = finalData.sort((a, b) => b.count - a.count);
+
+        categoriesCache = sortedData as Category[];
+        return sortedData as Category[];
+      } catch (err) {
+        console.error('Error in api.categories.getAll:', err);
+        // Fallback to simple fetch if complex one fails
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .order('name');
         
-      if (error) throw error;
-      categoriesCache = data as Category[];
-      return data as Category[];
+        if (error) throw error;
+        return (data as any[]).map(c => ({ ...c, count: 0 }));
+      }
     },
     create: async (name: string, icon: string, parent_id?: string): Promise<Category> => {
       const { data, error } = await supabase
@@ -329,6 +369,21 @@ export const api = {
         .single();
 
       if (error) throw error;
+
+      // Update images if provided
+      if (updates.images && updates.images.length > 0) {
+        // Delete existing images
+        await supabase.from('listing_images').delete().eq('listing_id', id);
+        
+        // Insert new images
+        const imageInserts = updates.images.map((url: string, index: number) => ({
+          listing_id: id,
+          image_url: url,
+          display_order: index
+        }));
+        await supabase.from('listing_images').insert(imageInserts);
+      }
+
       return data as Listing;
     },
     delete: async (id: string | number, _token: string): Promise<void> => {
@@ -527,33 +582,49 @@ export const api = {
 
       if (error) throw error;
 
-      return (data as any[]).map(conv => {
+      // Group by other user ID to consolidate chats
+      const groupedConversations: Record<string, any> = {};
+
+      (data as any[]).forEach(conv => {
         const otherUser = conv.buyer_id === session.user.id ? conv.seller : conv.buyer;
+        if (!otherUser) return;
+
         const lastMessage = conv.messages?.sort((a: any, b: any) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
         
         const buyerUnread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id === conv.seller_id).length || 0;
         const sellerUnread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id === conv.buyer_id).length || 0;
+        const unreadCount = conv.buyer_id === session.user.id ? buyerUnread : sellerUnread;
 
-        return {
-          id: conv.id,
-          listing_id: conv.listing_id,
-          listing: {
-            id: conv.listing?.id,
-            title: conv.listing?.title,
-            image: conv.listing?.thumbnail_url
-          },
-          other_user: otherUser,
-          seller: conv.seller,
-          buyer: conv.buyer,
-          last_message: lastMessage?.content,
-          last_message_at: conv.last_message_at,
-          buyer_unread_count: buyerUnread,
-          seller_unread_count: sellerUnread,
-          unread_count: conv.buyer_id === session.user.id ? buyerUnread : sellerUnread
-        };
+        if (!groupedConversations[otherUser.id] || new Date(conv.last_message_at) > new Date(groupedConversations[otherUser.id].last_message_at)) {
+          groupedConversations[otherUser.id] = {
+            id: conv.id,
+            listing_id: conv.listing_id,
+            listing: {
+              id: conv.listing?.id,
+              title: conv.listing?.title,
+              image: conv.listing?.thumbnail_url
+            },
+            other_user: otherUser,
+            seller: conv.seller,
+            buyer: conv.buyer,
+            last_message: lastMessage?.content,
+            last_message_at: conv.last_message_at,
+            unread_count: unreadCount,
+            // Keep track of all conversation IDs for this user to mark all as read later if needed
+            all_conversation_ids: [conv.id]
+          };
+        } else {
+          // Add unread count and conversation ID to existing group
+          groupedConversations[otherUser.id].unread_count += unreadCount;
+          groupedConversations[otherUser.id].all_conversation_ids.push(conv.id);
+        }
       });
+
+      return Object.values(groupedConversations).sort((a: any, b: any) => 
+        new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+      );
     },
     getMessages: async (conversationId: string, _token: string): Promise<any[]> => {
       const { data, error } = await supabase
@@ -610,14 +681,23 @@ export const api = {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Unauthorized');
 
+      // Check for ANY existing conversation between these two users
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
-        .eq('listing_id', listingId)
         .or(`and(buyer_id.eq.${session.user.id},seller_id.eq.${sellerId}),and(buyer_id.eq.${sellerId},seller_id.eq.${session.user.id})`)
+        .order('last_message_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (existing) return existing;
+      if (existing) {
+        // Update the listing_id to the current one so the context is updated
+        await supabase
+          .from('conversations')
+          .update({ listing_id: listingId })
+          .eq('id', existing.id);
+        return existing;
+      }
 
       const { data, error } = await supabase
         .from('conversations')

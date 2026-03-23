@@ -10,18 +10,20 @@ import { ProfileView } from './components/ProfileView';
 import { ChatView } from './components/ChatView';
 import { BottomNav } from './components/BottomNav';
 import { ConfirmationModal } from './components/ConfirmationModal';
-import { api, Listing } from './services/api';
+import { api, Listing, UserProfile } from './services/api';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETHIOPIAN_LOCATIONS } from './constants/locations';
 import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { getOptimizedImageUrl } from './lib/imageUtils';
+import { PhoneVerificationModal } from './components/PhoneVerificationModal';
 
 export default function App() {
   const [isPostAdOpen, setIsPostAdOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedProduct, setSelectedProduct] = useState<Listing | null>(null);
   const [isAdminView, setIsAdminView] = useState(false);
@@ -182,6 +184,8 @@ export default function App() {
   const handleSellClick = () => {
     if (!user) {
       setIsAuthOpen(true);
+    } else if (!userProfile?.phone) {
+      setIsPhoneModalOpen(true);
     } else {
       setIsPostAdOpen(true);
     }
@@ -327,7 +331,7 @@ export default function App() {
               >
                 <div className="relative">
                   <MessageCircle className="w-5 h-5" />
-                  {unreadCount > 0 && (
+                  {unreadCount > 0 && activeTab !== 'messages' && (
                     <div className="absolute -top-2 -right-2">
                       <div className="relative">
                         <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-25"></div>
@@ -428,7 +432,7 @@ export default function App() {
           <ProductDetail 
             product={selectedProduct} 
             onBack={() => setSelectedProduct(null)} 
-            onViewProduct={(listing) => setSelectedProduct(listing)}
+            onViewProduct={(listing) => handleOpenListing(listing.id)}
             onStartChat={handleStartChat}
             onEdit={(listing) => {
               setEditingListing(listing);
@@ -439,7 +443,7 @@ export default function App() {
         ) : activeTab === 'items' ? (
           <MyListings 
             onBack={() => setActiveTab('home')}
-            onViewProduct={(listing) => setSelectedProduct(listing)}
+            onViewProduct={(listing) => handleOpenListing(listing.id)}
             onEditProfile={() => setActiveTab('profile')}
           />
         ) : activeTab === 'profile' ? (
@@ -666,7 +670,7 @@ export default function App() {
                   isPromoted={listing.isPromoted}
                   isFavorited={listing.isFavorited}
                   viewMode={viewMode} 
-                  onClick={() => setSelectedProduct(listing)}
+                  onClick={() => handleOpenListing(listing.id)}
                   onFavorite={() => handleToggleFavorite(listing.id)}
                 />
               ))
@@ -806,6 +810,15 @@ export default function App() {
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
         onSuccess={() => {}} 
+      />
+
+      <PhoneVerificationModal
+        isOpen={isPhoneModalOpen}
+        onClose={() => setIsPhoneModalOpen(false)}
+        onSuccess={(phone) => {
+          setUserProfile((prev: UserProfile | null) => prev ? { ...prev, phone } : null);
+          setIsPostAdOpen(true);
+        }}
       />
 
       <ConfirmationModal

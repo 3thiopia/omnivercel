@@ -47,7 +47,7 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
       >
         <div className="relative">
           <MessageCircle className="w-6 h-6" />
-          {unreadCount > 0 && (
+          {unreadCount > 0 && activeTab !== 'messages' && (
             <div className="absolute -top-1 -right-1">
               <div className="relative">
                 <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20"></div>

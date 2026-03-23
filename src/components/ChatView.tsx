@@ -26,8 +26,8 @@ interface Conversation {
     full_name: string;
     avatar_url: string;
   };
-  buyer_unread_count: number;
-  seller_unread_count: number;
+  unread_count: number;
+  all_conversation_ids: string[];
   listing: {
     id: string;
     title: string;
@@ -142,11 +142,24 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
           filter: `conversation_id=eq.${selectedConversation.id}`,
         },
         (payload) => {
+          const newMsg = payload.new as Message;
           setMessages((prev) => {
             // Avoid duplicates
-            if (prev.some(m => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new as Message];
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
           });
+          
+          // If the message is from the other user, mark it as read immediately
+          if (newMsg.sender_id !== currentUserId) {
+            supabase
+              .from('messages')
+              .update({ is_read: true })
+              .eq('id', newMsg.id)
+              .then(() => {
+                // Trigger unread count refresh in App.tsx
+                window.dispatchEvent(new CustomEvent('refresh-unread-count'));
+              });
+          }
           
           // Refresh conversations to update last message in sidebar
           fetchConversations();
@@ -185,6 +198,16 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
       
       const data = await api.chats.getMessages(conversationId, session.access_token);
       setMessages(data);
+      
+      // Mark all consolidated conversations as read
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv?.all_conversation_ids) {
+        for (const id of conv.all_conversation_ids) {
+          if (id !== conversationId) {
+            await api.chats.getMessages(id, session.access_token);
+          }
+        }
+      }
       
       // Trigger unread count refresh in App.tsx
       window.dispatchEvent(new CustomEvent('refresh-unread-count'));
@@ -235,16 +258,16 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
     <div className="max-w-6xl mx-auto h-[calc(100vh-12rem)] flex bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
       {/* Sidebar */}
       <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-black text-gray-900 mb-4">Messages</h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="p-6 border-b border-gray-100 bg-white">
+          <h2 className="text-2xl font-black text-gray-900 mb-6 tracking-tight">Messages</h2>
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
             <input 
               type="text"
-              placeholder="Search chats..."
+              placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-xl py-2 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 outline-none"
+              className="w-full bg-gray-50 border border-transparent rounded-2xl py-3 pl-11 pr-4 text-sm font-medium focus:bg-white focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none"
             />
           </div>
         </div>
@@ -268,34 +291,34 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                 className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-all border-b border-gray-50 ${selectedConversation?.id === conv.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-500' : ''}`}
               >
                 <div className="relative flex-shrink-0">
-                  <div className="w-12 h-12 rounded-2xl bg-gray-100 overflow-hidden">
+                  <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-sm">
                     {conv.other_user.avatar_url ? (
                       <img src={getOptimizedImageUrl(conv.other_user.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <User className="w-6 h-6" />
+                        <User className="w-7 h-7" />
                       </div>
                     )}
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-white p-0.5 shadow-sm">
-                    <img src={getOptimizedImageUrl(conv.listing?.image, { width: 50, height: 50 })} alt="" className="w-full h-full rounded-md object-cover" />
-                  </div>
+                  {conv.unread_count > 0 && (
+                    <div className="absolute top-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm"></div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <div className="flex justify-between items-start mb-0.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <h4 className="font-bold text-gray-900 truncate">{conv.other_user?.full_name || 'User'}</h4>
-                      {((currentUserId === conv.seller?.id && conv.seller_unread_count > 0) || 
-                        (currentUserId !== conv.seller?.id && conv.buyer_unread_count > 0)) && (
-                        <span className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0 animate-pulse"></span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">
+                  <div className="flex justify-between items-center mb-1">
+                    <h4 className="font-bold text-gray-900 truncate text-base">{conv.other_user?.full_name || 'User'}</h4>
+                    <span className="text-[10px] text-gray-400 font-medium">
                       {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider truncate mb-1">{conv.listing?.title || 'Unknown Listing'}</p>
-                  <p className="text-xs text-gray-500 truncate">{conv.last_message || 'Start a conversation'}</p>
+                  <p className="text-xs text-gray-500 truncate leading-relaxed">
+                    {conv.unread_count > 0 && <span className="font-bold text-emerald-600 mr-1">New:</span>}
+                    {conv.last_message || 'Start a conversation'}
+                  </p>
+                  <div className="flex items-center gap-1 mt-1 opacity-60">
+                    <Package className="w-3 h-3 text-gray-400" />
+                    <p className="text-[9px] text-gray-400 font-medium truncate uppercase tracking-wider">{conv.listing?.title || 'Unknown Listing'}</p>
+                  </div>
                 </div>
               </button>
             ))
@@ -308,7 +331,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-100 flex items-center justify-between">
+            <div className="p-4 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm z-10">
               <div className="flex items-center gap-3">
                 <button 
                   onClick={() => setSelectedConversation(null)}
@@ -317,45 +340,34 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 
-                <div className="flex items-center -space-x-3">
-                  {/* Other User Avatar */}
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-white overflow-hidden z-10 shadow-sm">
-                    {selectedConversation.other_user?.avatar_url ? (
-                      <img src={getOptimizedImageUrl(selectedConversation.other_user.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <User className="w-5 h-5" />
-                      </div>
-                    )}
-                  </div>
-                  {/* Seller Avatar (if different from other_user) */}
-                  {selectedConversation.seller?.id !== selectedConversation.other_user?.id && (
-                    <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-white overflow-hidden z-0 shadow-sm">
-                      {selectedConversation.seller?.avatar_url ? (
-                        <img src={getOptimizedImageUrl(selectedConversation.seller.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <User className="w-5 h-5" />
-                        </div>
-                      )}
+                <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shadow-sm border border-gray-50">
+                  {selectedConversation.other_user?.avatar_url ? (
+                    <img src={getOptimizedImageUrl(selectedConversation.other_user.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <User className="w-5 h-5" />
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-gray-900 leading-tight flex items-center gap-1">
-                    <span>{selectedConversation.other_user?.full_name || 'User'}</span>
-                    {selectedConversation.seller?.id !== selectedConversation.other_user?.id && (
-                      <span className="text-gray-400 font-normal text-xs">& {selectedConversation.seller?.full_name}</span>
-                    )}
+                  <h3 className="font-bold text-gray-900 leading-tight text-base">
+                    {selectedConversation.other_user?.full_name || 'User'}
                   </h3>
-                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-wider">{selectedConversation.listing?.title || 'Unknown Listing'}</p>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Active Now</p>
+                  </div>
                 </div>
               </div>
+              
               <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-emerald-500 transition-all">
-                  <Package className="w-5 h-5" />
-                </button>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100">
+                  <Package className="w-4 h-4 text-emerald-500" />
+                  <span className="text-[10px] font-bold text-gray-600 truncate max-w-[120px] uppercase tracking-tight">
+                    {selectedConversation.listing?.title}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -386,9 +398,9 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                   return (
                     <div 
                       key={msg.id}
-                      className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-4' : 'mt-0.5'}`}
+                      className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
                     >
-                      <div className={`relative max-w-[85%] px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                      <div className={`relative max-w-[80%] px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
                         isMe 
                           ? `bg-emerald-500 text-white ${
                               isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tr-none' :
@@ -396,7 +408,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                               isLastInGroup ? 'rounded-2xl rounded-tr-md rounded-br-none' :
                               'rounded-2xl rounded-tr-md rounded-br-md'
                             }` 
-                          : `bg-white text-gray-900 border border-gray-100 shadow-sm ${
+                          : `bg-white text-gray-900 border border-gray-100 ${
                               isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tl-none' :
                               isFirstInGroup ? 'rounded-2xl rounded-tl-none rounded-bl-md' :
                               isLastInGroup ? 'rounded-2xl rounded-tl-md rounded-bl-none' :
