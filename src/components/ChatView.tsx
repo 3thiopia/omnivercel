@@ -161,8 +161,23 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                 .update({ is_read: true })
                 .eq('id', newMsg.id)
                 .then(() => {
-                  // Trigger unread count refresh in App.tsx
-                  window.dispatchEvent(new CustomEvent('refresh-unread-count'));
+                  // Also reset conversation unread count
+                  supabase
+                    .from('conversations')
+                    .update({ buyer_unread_count: 0 })
+                    .eq('id', newMsg.conversation_id)
+                    .eq('buyer_id', currentUserId)
+                    .then(() => {
+                      supabase
+                        .from('conversations')
+                        .update({ seller_unread_count: 0 })
+                        .eq('id', newMsg.conversation_id)
+                        .eq('seller_id', currentUserId)
+                        .then(() => {
+                          // Trigger unread count refresh in App.tsx
+                          window.dispatchEvent(new CustomEvent('refresh-unread-count'));
+                        });
+                    });
                 });
             }
             
@@ -297,7 +312,9 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                     )}
                   </div>
                   {conv.unread_count > 0 && (
-                    <div className="absolute top-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm"></div>
+                    <div className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                      {conv.unread_count}
+                    </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">

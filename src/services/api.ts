@@ -652,11 +652,27 @@ export const api = {
       
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        // Mark messages as read
         await supabase
           .from('messages')
           .update({ is_read: true })
           .in('conversation_id', ids)
           .neq('sender_id', session.user.id);
+
+        // Reset unread count for the current user in these conversations
+        for (const id of ids) {
+          await supabase
+            .from('conversations')
+            .update({ buyer_unread_count: 0 })
+            .eq('id', id)
+            .eq('buyer_id', session.user.id);
+
+          await supabase
+            .from('conversations')
+            .update({ seller_unread_count: 0 })
+            .eq('id', id)
+            .eq('seller_id', session.user.id);
+        }
       }
 
       return data;
@@ -677,10 +693,33 @@ export const api = {
 
       if (error) throw error;
 
+      // Update last message time
       await supabase
         .from('conversations')
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', conversationId);
+
+      // Increment unread count for the recipient
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('buyer_id, seller_id, buyer_unread_count, seller_unread_count')
+        .eq('id', conversationId)
+        .single();
+
+      if (conv) {
+        const isBuyer = conv.buyer_id === session.user.id;
+        if (isBuyer) {
+          await supabase
+            .from('conversations')
+            .update({ seller_unread_count: (conv.seller_unread_count || 0) + 1 })
+            .eq('id', conversationId);
+        } else {
+          await supabase
+            .from('conversations')
+            .update({ buyer_unread_count: (conv.buyer_unread_count || 0) + 1 })
+            .eq('id', conversationId);
+        }
+      }
 
       return data;
     },
