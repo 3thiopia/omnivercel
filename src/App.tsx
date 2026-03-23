@@ -250,9 +250,38 @@ export default function App() {
 
     window.addEventListener('navigate-to-chat', handleNavigation);
     window.addEventListener('refresh-unread-count', fetchUnreadCount);
+
+    // Global real-time subscription for unread count
+    const channel = supabase
+      .channel('global-chat-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
     return () => {
       window.removeEventListener('navigate-to-chat', handleNavigation);
       window.removeEventListener('refresh-unread-count', fetchUnreadCount);
+      supabase.removeChannel(channel);
     };
   }, [user]);
 

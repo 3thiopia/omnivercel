@@ -555,14 +555,19 @@ export const api = {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return { count: 0 };
 
-      const { count, error } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_read', false)
-        .neq('sender_id', session.user.id);
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('buyer_id, seller_id, buyer_unread_count, seller_unread_count')
+        .or(`buyer_id.eq.${session.user.id},seller_id.eq.${session.user.id}`);
 
       if (error) throw error;
-      return { count: count || 0 };
+
+      const totalUnread = (data as any[]).reduce((sum, conv) => {
+        const isBuyer = conv.buyer_id === session.user.id;
+        return sum + (isBuyer ? (conv.buyer_unread_count || 0) : (conv.seller_unread_count || 0));
+      }, 0);
+
+      return { count: totalUnread };
     },
     getConversations: async (_token: string): Promise<any[]> => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -589,15 +594,13 @@ export const api = {
         const otherUser = conv.buyer_id === session.user.id ? conv.seller : conv.buyer;
         if (!otherUser) return;
 
+        const unreadCount = conv.buyer_id === session.user.id ? (conv.buyer_unread_count || 0) : (conv.seller_unread_count || 0);
+
         const lastMessage = conv.messages?.sort((a: any, b: any) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
-        
-        const buyerUnread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id === conv.seller_id).length || 0;
-        const sellerUnread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id === conv.buyer_id).length || 0;
-        const unreadCount = conv.buyer_id === session.user.id ? buyerUnread : sellerUnread;
 
-        if (!groupedConversations[otherUser.id] || new Date(conv.last_message_at) > new Date(groupedConversations[otherUser.id].last_message_at)) {
+        if (!groupedConversations[otherUser.id]) {
           groupedConversations[otherUser.id] = {
             id: conv.id,
             listing_id: conv.listing_id,
@@ -612,13 +615,24 @@ export const api = {
             last_message: lastMessage?.content,
             last_message_at: conv.last_message_at,
             unread_count: unreadCount,
-            // Keep track of all conversation IDs for this user to mark all as read later if needed
             all_conversation_ids: [conv.id]
           };
         } else {
-          // Add unread count and conversation ID to existing group
-          groupedConversations[otherUser.id].unread_count += unreadCount;
-          groupedConversations[otherUser.id].all_conversation_ids.push(conv.id);
+          const existing = groupedConversations[otherUser.id];
+          existing.unread_count += unreadCount;
+          existing.all_conversation_ids.push(conv.id);
+          
+          if (new Date(conv.last_message_at) > new Date(existing.last_message_at)) {
+            existing.id = conv.id;
+            existing.listing_id = conv.listing_id;
+            existing.listing = {
+              id: conv.listing?.id,
+              title: conv.listing?.title,
+              image: conv.listing?.thumbnail_url
+            };
+            existing.last_message = lastMessage?.content;
+            existing.last_message_at = conv.last_message_at;
+          }
         }
       });
 
@@ -626,11 +640,12 @@ export const api = {
         new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
       );
     },
-    getMessages: async (conversationId: string, _token: string): Promise<any[]> => {
+    getMessages: async (conversationIds: string | string[], _token: string): Promise<any[]> => {
+      const ids = Array.isArray(conversationIds) ? conversationIds : [conversationIds];
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('conversation_id', conversationId)
+        .in('conversation_id', ids)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -640,7 +655,7 @@ export const api = {
         await supabase
           .from('messages')
           .update({ is_read: true })
-          .eq('conversation_id', conversationId)
+          .in('conversation_id', ids)
           .neq('sender_id', session.user.id);
       }
 

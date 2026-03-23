@@ -10,6 +10,7 @@ interface Message {
   content: string;
   sender_id: string;
   created_at: string;
+  conversation_id: string;
 }
 
 interface Conversation {
@@ -61,7 +62,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
           const found = convs?.find((c: any) => c.id === conversationId);
           if (found) {
             setSelectedConversation(found);
-            fetchMessages(found.id);
+            fetchMessages(found.all_conversation_ids || [found.id]);
           }
         });
       }
@@ -91,7 +92,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
       const found = conversations.find(c => c.id === initialConversationId);
       if (found) {
         setSelectedConversation(found);
-        fetchMessages(found.id);
+        fetchMessages(found.all_conversation_ids || [found.id]);
         onConversationSelected?.();
       } else {
         // If not in current list, fetch again
@@ -99,7 +100,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
           const foundNew = convs?.find((c: any) => c.id === initialConversationId);
           if (foundNew) {
             setSelectedConversation(foundNew);
-            fetchMessages(foundNew.id);
+            fetchMessages(foundNew.all_conversation_ids || [foundNew.id]);
             onConversationSelected?.();
           }
         });
@@ -130,39 +131,44 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
   useEffect(() => {
     if (!selectedConversation?.id) return;
 
-    // Subscribe to new messages for this conversation
+    // Subscribe to new messages for any of the conversation IDs in this consolidated thread
+    const conversationIds = selectedConversation.all_conversation_ids || [selectedConversation.id];
+    
     const channel = supabase
-      .channel(`messages:${selectedConversation.id}`)
+      .channel(`messages:consolidated:${selectedConversation.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `conversation_id=eq.${selectedConversation.id}`,
         },
         (payload) => {
           const newMsg = payload.new as Message;
-          setMessages((prev) => {
-            // Avoid duplicates
-            if (prev.some(m => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
           
-          // If the message is from the other user, mark it as read immediately
-          if (newMsg.sender_id !== currentUserId) {
-            supabase
-              .from('messages')
-              .update({ is_read: true })
-              .eq('id', newMsg.id)
-              .then(() => {
-                // Trigger unread count refresh in App.tsx
-                window.dispatchEvent(new CustomEvent('refresh-unread-count'));
-              });
+          // Check if this message belongs to any of our consolidated conversations
+          if (conversationIds.includes(newMsg.conversation_id)) {
+            setMessages((prev) => {
+              // Avoid duplicates
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+            
+            // If the message is from the other user, mark it as read immediately
+            if (newMsg.sender_id !== currentUserId) {
+              supabase
+                .from('messages')
+                .update({ is_read: true })
+                .eq('id', newMsg.id)
+                .then(() => {
+                  // Trigger unread count refresh in App.tsx
+                  window.dispatchEvent(new CustomEvent('refresh-unread-count'));
+                });
+            }
+            
+            // Refresh conversations to update last message in sidebar
+            fetchConversations();
           }
-          
-          // Refresh conversations to update last message in sidebar
-          fetchConversations();
         }
       )
       .subscribe();
@@ -170,7 +176,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedConversation?.id]);
+  }, [selectedConversation?.id, currentUserId]);
 
   const fetchConversations = async () => {
     setIsLoading(true);
@@ -190,24 +196,14 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
     }
   };
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = async (conversationIds: string | string[]) => {
     setIsMessagesLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      const data = await api.chats.getMessages(conversationId, session.access_token);
+      const data = await api.chats.getMessages(conversationIds, session.access_token);
       setMessages(data);
-      
-      // Mark all consolidated conversations as read
-      const conv = conversations.find(c => c.id === conversationId);
-      if (conv?.all_conversation_ids) {
-        for (const id of conv.all_conversation_ids) {
-          if (id !== conversationId) {
-            await api.chats.getMessages(id, session.access_token);
-          }
-        }
-      }
       
       // Trigger unread count refresh in App.tsx
       window.dispatchEvent(new CustomEvent('refresh-unread-count'));
@@ -285,7 +281,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                 onClick={() => {
                   if (conv.id) {
                     setSelectedConversation(conv);
-                    fetchMessages(conv.id);
+                    fetchMessages(conv.all_conversation_ids || [conv.id]);
                   }
                 }}
                 className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-all border-b border-gray-50 ${selectedConversation?.id === conv.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-500' : ''}`}
