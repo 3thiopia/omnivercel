@@ -128,14 +128,39 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
     }
   };
 
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<any>(null);
+
+  const handleTyping = () => {
+    if (!selectedConversation || !currentUserId || !channelRef.current) return;
+    
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: currentUserId, isTyping: true }
+    });
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: currentUserId, isTyping: false }
+      });
+    }, 3000);
+  };
+
   useEffect(() => {
     if (!selectedConversation?.id) return;
 
-    // Subscribe to new messages for any of the conversation IDs in this consolidated thread
+    // Subscribe to new messages and typing events
     const conversationIds = selectedConversation.all_conversation_ids || [selectedConversation.id];
     
-    const channel = supabase
-      .channel(`messages:consolidated:${selectedConversation.id}`)
+    const channel = supabase.channel(`chat:${selectedConversation.id}`);
+    channelRef.current = channel;
+
+    channel
       .on(
         'postgres_changes',
         {
@@ -144,57 +169,73 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
           table: 'messages',
         },
         (payload) => {
+          console.log('Real-time message received:', payload);
           const newMsg = payload.new as Message;
           
-          // Check if this message belongs to any of our consolidated conversations
           if (conversationIds.includes(newMsg.conversation_id)) {
             setMessages((prev) => {
-              // Avoid duplicates
               if (prev.some(m => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
             
-            // If the message is from the other user, mark it as read immediately
+            setConversations(prev => {
+              const updated = prev.map(c => {
+                const isThisConv = c.id === newMsg.conversation_id || c.all_conversation_ids?.includes(newMsg.conversation_id);
+                if (isThisConv) {
+                  return {
+                    ...c,
+                    last_message: newMsg.content,
+                    last_message_at: newMsg.created_at,
+                    unread_count: newMsg.sender_id !== currentUserId ? (c.unread_count || 0) + 1 : c.unread_count
+                  };
+                }
+                return c;
+              });
+              return updated.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+            });
+
             if (newMsg.sender_id !== currentUserId) {
+              setIsOtherUserTyping(false); // Stop typing indicator when message received
               supabase
                 .from('messages')
                 .update({ is_read: true })
                 .eq('id', newMsg.id)
                 .then(() => {
-                  // Also reset conversation unread count
-                  supabase
-                    .from('conversations')
-                    .update({ buyer_unread_count: 0 })
-                    .eq('id', newMsg.conversation_id)
-                    .eq('buyer_id', currentUserId)
-                    .then(() => {
-                      supabase
-                        .from('conversations')
-                        .update({ seller_unread_count: 0 })
-                        .eq('id', newMsg.conversation_id)
-                        .eq('seller_id', currentUserId)
-                        .then(() => {
-                          // Trigger unread count refresh in App.tsx
-                          window.dispatchEvent(new CustomEvent('refresh-unread-count'));
-                        });
-                    });
+                  // Reset unread count locally for the active conversation
+                  setConversations(prev => prev.map(c => {
+                    const isThisConv = c.id === newMsg.conversation_id || c.all_conversation_ids?.includes(newMsg.conversation_id);
+                    if (isThisConv) {
+                      return { ...c, unread_count: 0 };
+                    }
+                    return c;
+                  }));
+                  
+                  window.dispatchEvent(new CustomEvent('refresh-unread-count'));
                 });
             }
-            
-            // Refresh conversations to update last message in sidebar
-            fetchConversations();
           }
         }
       )
-      .subscribe();
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        console.log('Typing broadcast received:', payload);
+        if (payload.payload.userId !== currentUserId) {
+          setIsOtherUserTyping(payload.payload.isTyping);
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to real-time chat updates');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [selectedConversation?.id, currentUserId]);
 
-  const fetchConversations = async () => {
-    setIsLoading(true);
+  const fetchConversations = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return [];
@@ -207,7 +248,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
       console.error('Error fetching conversations:', err);
       return [];
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -230,12 +271,15 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
     }
   };
 
+  const [isSending, setIsSending] = useState(false);
+
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation?.id || !currentUserId) return;
+    if (!newMessage.trim() || !selectedConversation?.id || !currentUserId || isSending) return;
 
     const content = newMessage.trim();
     setNewMessage('');
+    setIsSending(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -244,10 +288,28 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
       const message = await api.chats.sendMessage(selectedConversation.id, content, session.access_token);
       setMessages(prev => [...prev, message]);
       
-      // Refresh conversations to update last message
-      fetchConversations();
+      // Update conversations list locally for instant feedback
+      setConversations(prev => {
+        const updated = prev.map(c => {
+          if (c.id === selectedConversation.id) {
+            return {
+              ...c,
+              last_message: content,
+              last_message_at: new Date().toISOString()
+            };
+          }
+          return c;
+        });
+        return updated.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+      });
+
+      // Refresh conversations silently to update last message
+      fetchConversations(true);
     } catch (err) {
       console.error('Error sending message:', err);
+      setNewMessage(content); // Restore message on error
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -391,74 +453,96 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                   <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
                 </div>
               ) : (
-                messages.map((msg, idx) => {
-                  const isMe = msg.sender_id === currentUserId;
-                  const prevMsg = idx > 0 ? messages[idx - 1] : null;
-                  const nextMsg = idx < messages.length - 1 ? messages[idx + 1] : null;
-                  
-                  const isSameSenderAsPrev = prevMsg?.sender_id === msg.sender_id;
-                  const isSameSenderAsNext = nextMsg?.sender_id === msg.sender_id;
-                  
-                  const timeDiffPrev = prevMsg ? (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) : Infinity;
-                  const isRecentAsPrev = timeDiffPrev < 2 * 60 * 1000; // 2 minutes threshold
-                  
-                  const timeDiffNext = nextMsg ? (new Date(nextMsg.created_at).getTime() - new Date(msg.created_at).getTime()) : Infinity;
-                  const isRecentAsNext = timeDiffNext < 2 * 60 * 1000;
-                  
-                  const isFirstInGroup = !isSameSenderAsPrev || !isRecentAsPrev;
-                  const isLastInGroup = !isSameSenderAsNext || !isRecentAsNext;
+                <AnimatePresence initial={false}>
+                  {messages.map((msg, idx) => {
+                    const isMe = msg.sender_id === currentUserId;
+                    const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                    const nextMsg = idx < messages.length - 1 ? messages[idx + 1] : null;
+                    
+                    const isSameSenderAsPrev = prevMsg?.sender_id === msg.sender_id;
+                    const isSameSenderAsNext = nextMsg?.sender_id === msg.sender_id;
+                    
+                    const timeDiffPrev = prevMsg ? (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) : Infinity;
+                    const isRecentAsPrev = timeDiffPrev < 2 * 60 * 1000; // 2 minutes threshold
+                    
+                    const timeDiffNext = nextMsg ? (new Date(nextMsg.created_at).getTime() - new Date(msg.created_at).getTime()) : Infinity;
+                    const isRecentAsNext = timeDiffNext < 2 * 60 * 1000;
+                    
+                    const isFirstInGroup = !isSameSenderAsPrev || !isRecentAsPrev;
+                    const isLastInGroup = !isSameSenderAsNext || !isRecentAsNext;
 
-                  return (
-                    <div 
-                      key={msg.id}
-                      className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
-                    >
-                      <div className={`relative max-w-[80%] px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
-                        isMe 
-                          ? `bg-emerald-500 text-white ${
-                              isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tr-none' :
-                              isFirstInGroup ? 'rounded-2xl rounded-tr-none rounded-br-md' :
-                              isLastInGroup ? 'rounded-2xl rounded-tr-md rounded-br-none' :
-                              'rounded-2xl rounded-tr-md rounded-br-md'
-                            }` 
-                          : `bg-white text-gray-900 border border-gray-100 ${
-                              isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tl-none' :
-                              isFirstInGroup ? 'rounded-2xl rounded-tl-none rounded-bl-md' :
-                              isLastInGroup ? 'rounded-2xl rounded-tl-md rounded-bl-none' :
-                              'rounded-2xl rounded-tl-md rounded-bl-md'
-                            }`
-                      }`}>
-                        {msg.content.includes('[PRODUCT_IMAGE]') ? (
-                          <div className="space-y-2">
-                            <p>{msg.content.split('[PRODUCT_IMAGE]')[0]}</p>
-                            <div className="rounded-xl overflow-hidden border border-black/5 bg-gray-50">
-                              <img 
-                                src={getOptimizedImageUrl(msg.content.split('[PRODUCT_IMAGE]')[1], { width: 400, height: 300 })} 
-                                alt="Product" 
-                                className="w-full h-auto object-cover"
-                                referrerPolicy="no-referrer"
-                              />
+                    return (
+                      <motion.div 
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.2 }}
+                        className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
+                      >
+                        <div className={`relative max-w-[80%] px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
+                          isMe 
+                            ? `bg-emerald-500 text-white ${
+                                isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tr-none' :
+                                isFirstInGroup ? 'rounded-2xl rounded-tr-none rounded-br-md' :
+                                isLastInGroup ? 'rounded-2xl rounded-tr-md rounded-br-none' :
+                                'rounded-2xl rounded-tr-md rounded-br-md'
+                              }`
+                            : `bg-white text-gray-800 border border-gray-100 ${
+                                isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tl-none' :
+                                isFirstInGroup ? 'rounded-2xl rounded-tl-none rounded-bl-md' :
+                                isLastInGroup ? 'rounded-2xl rounded-tl-md rounded-bl-none' :
+                                'rounded-2xl rounded-tl-md rounded-bl-md'
+                              }`
+                        }`}>
+                          {msg.content.includes('[PRODUCT_IMAGE]') ? (
+                            <div className="space-y-2">
+                              <p>{msg.content.split('[PRODUCT_IMAGE]')[0]}</p>
+                              <div className="rounded-xl overflow-hidden border border-black/5 bg-gray-50">
+                                <img 
+                                  src={getOptimizedImageUrl(msg.content.split('[PRODUCT_IMAGE]')[1], { width: 400, height: 300 })} 
+                                  alt="Product" 
+                                  className="w-full h-auto object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
                             </div>
+                          ) : (
+                            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                          )}
+                          <div className={`flex items-center justify-between gap-4 mt-1 ${!isLastInGroup && 'hidden group-hover:flex'}`}>
+                            <span className={`text-[8px] block ${isMe ? 'text-emerald-100' : 'text-gray-400'}`}>
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <button 
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-black/5 ${isMe ? 'text-emerald-100 hover:text-white' : 'text-gray-300 hover:text-red-500'}`}
+                              title="Delete for me"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
-                        ) : (
-                          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                        )}
-                        <div className={`flex items-center justify-between gap-4 mt-1 ${!isLastInGroup && 'hidden group-hover:flex'}`}>
-                          <span className={`text-[8px] block ${isMe ? 'text-emerald-100' : 'text-gray-400'}`}>
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <button 
-                            onClick={() => handleDeleteMessage(msg.id)}
-                            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-black/5 ${isMe ? 'text-emerald-100 hover:text-white' : 'text-gray-300 hover:text-red-500'}`}
-                            title="Delete for me"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
                         </div>
+                      </motion.div>
+                    );
+                  })}
+                  {isOtherUserTyping && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="flex justify-start mt-2"
+                    >
+                      <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                        </div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Typing...</span>
                       </div>
-                    </div>
-                  );
-                })
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -469,16 +553,19 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                 <input 
                   type="text"
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    handleTyping();
+                  }}
                   placeholder="Type a message..."
                   className="flex-1 bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 outline-none"
                 />
                 <button 
                   type="submit"
-                  disabled={!newMessage.trim()}
+                  disabled={!newMessage.trim() || isSending}
                   className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
                 >
-                  <Send className="w-5 h-5" />
+                  {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
               </form>
             </div>
