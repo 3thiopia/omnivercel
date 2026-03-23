@@ -475,7 +475,7 @@ export default function App() {
       </nav>
     )}
       
-      <main className={`${viewMode === 'grid' ? 'max-w-7xl' : 'max-w-3xl'} mx-auto pb-20 lg:pb-0 px-4 transition-all duration-500`}>
+      <main className={`${activeTab === 'messages' ? 'max-w-full px-0' : (viewMode === 'grid' ? 'max-w-7xl px-4' : 'max-w-3xl px-4')} mx-auto pb-20 lg:pb-0 transition-all duration-500`}>
         {isAdminView && userProfile?.role === 'admin' ? (
           <AdminDashboard 
             listings={listings} 
