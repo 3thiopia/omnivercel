@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { MessageCircle, Send, User, ArrowLeft, Loader2, Package, Search, Trash2 } from 'lucide-react';
+import { MessageCircle, Send, User, ArrowLeft, Loader2, Package, Search, Trash2, Check, CheckCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../services/api';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,7 @@ interface Message {
   sender_id: string;
   created_at: string;
   conversation_id: string;
+  is_read?: boolean;
 }
 
 interface Conversation {
@@ -152,12 +153,13 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
   };
 
   useEffect(() => {
-    if (!selectedConversation?.id) return;
+    if (!selectedConversation?.id || !currentUserId) return;
 
-    // Subscribe to new messages and typing events
+    console.log('Setting up real-time for conversation:', selectedConversation.id);
     const conversationIds = selectedConversation.all_conversation_ids || [selectedConversation.id];
     
-    const channel = supabase.channel(`chat:${selectedConversation.id}`);
+    // Use a unique channel name for this specific conversation view
+    const channel = supabase.channel(`chat-room-${selectedConversation.id}`);
     channelRef.current = channel;
 
     channel
@@ -169,15 +171,20 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
           table: 'messages',
         },
         (payload) => {
-          console.log('Real-time message received:', payload);
           const newMsg = payload.new as Message;
+          console.log('New message detected via real-time:', newMsg);
           
+          // Check if this message belongs to the current conversation thread
           if (conversationIds.includes(newMsg.conversation_id)) {
+            console.log('Message belongs to current thread, updating state...');
+            
             setMessages((prev) => {
+              // Prevent duplicates (e.g. if we sent it ourselves and already added it)
               if (prev.some(m => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
             
+            // Update the sidebar preview instantly
             setConversations(prev => {
               const updated = prev.map(c => {
                 const isThisConv = c.id === newMsg.conversation_id || c.all_conversation_ids?.includes(newMsg.conversation_id);
@@ -191,25 +198,28 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                 }
                 return c;
               });
-              return updated.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+              // Re-sort to bring active conversation to top
+              return [...updated].sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
             });
 
+            // If it's an incoming message, handle read status and typing
             if (newMsg.sender_id !== currentUserId) {
-              setIsOtherUserTyping(false); // Stop typing indicator when message received
+              setIsOtherUserTyping(false);
+              
+              // Mark as read in DB
               supabase
                 .from('messages')
                 .update({ is_read: true })
                 .eq('id', newMsg.id)
                 .then(() => {
-                  // Reset unread count locally for the active conversation
+                  // Reset local unread count for this conversation
                   setConversations(prev => prev.map(c => {
                     const isThisConv = c.id === newMsg.conversation_id || c.all_conversation_ids?.includes(newMsg.conversation_id);
-                    if (isThisConv) {
-                      return { ...c, unread_count: 0 };
-                    }
+                    if (isThisConv) return { ...c, unread_count: 0 };
                     return c;
                   }));
                   
+                  // Notify App.tsx to refresh global unread badge
                   window.dispatchEvent(new CustomEvent('refresh-unread-count'));
                 });
             }
@@ -217,18 +227,16 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
         }
       )
       .on('broadcast', { event: 'typing' }, (payload) => {
-        console.log('Typing broadcast received:', payload);
         if (payload.payload.userId !== currentUserId) {
           setIsOtherUserTyping(payload.payload.isTyping);
         }
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Subscribed to real-time chat updates');
-        }
+        console.log(`Real-time subscription status for ${selectedConversation.id}:`, status);
       });
 
     return () => {
+      console.log('Cleaning up real-time for conversation:', selectedConversation.id);
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
@@ -330,26 +338,33 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
   return (
     <div className="max-w-6xl mx-auto h-[calc(100vh-12rem)] flex bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
       {/* Sidebar */}
-      <div className={`w-full md:w-80 border-r border-gray-100 flex flex-col ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-6 border-b border-gray-100 bg-white">
-          <h2 className="text-2xl font-black text-gray-900 mb-6 tracking-tight">Messages</h2>
+      <div className={`w-full md:w-96 border-r border-gray-100 flex flex-col bg-white ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Chats</h2>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+          </div>
           <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
             <input 
               type="text"
-              placeholder="Search conversations..."
+              placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 border border-transparent rounded-2xl py-3 pl-11 pr-4 text-sm font-medium focus:bg-white focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none"
+              className="w-full bg-gray-50 border-none rounded-2xl py-3.5 pl-11 pr-4 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all outline-none"
             />
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar space-y-1 p-2">
           {filteredConversations.length === 0 ? (
             <div className="p-8 text-center">
-              <MessageCircle className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm font-medium">No messages yet</p>
+              <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-gray-200" />
+              </div>
+              <p className="text-gray-400 text-sm font-semibold">No conversations found</p>
             </div>
           ) : (
             filteredConversations.map((conv, idx) => (
@@ -361,38 +376,44 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                     fetchMessages(conv.all_conversation_ids || [conv.id]);
                   }
                 }}
-                className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-all border-b border-gray-50 ${selectedConversation?.id === conv.id ? 'bg-emerald-50/50 border-l-4 border-l-emerald-500' : ''}`}
+                className={`w-full p-3 flex items-center gap-3 rounded-2xl transition-all duration-200 group ${
+                  selectedConversation?.id === conv.id 
+                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                    : 'hover:bg-gray-50 text-gray-900'
+                }`}
               >
                 <div className="relative flex-shrink-0">
-                  <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-sm">
+                  <div className={`w-14 h-14 rounded-2xl overflow-hidden border-2 shadow-sm transition-transform group-hover:scale-105 ${
+                    selectedConversation?.id === conv.id ? 'border-emerald-400' : 'border-white'
+                  }`}>
                     {conv.other_user.avatar_url ? (
                       <img src={getOptimizedImageUrl(conv.other_user.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className={`w-full h-full flex items-center justify-center ${selectedConversation?.id === conv.id ? 'bg-emerald-400 text-white' : 'bg-gray-100 text-gray-400'}`}>
                         <User className="w-7 h-7" />
                       </div>
                     )}
                   </div>
-                  {conv.unread_count > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                      {conv.unread_count}
-                    </div>
-                  )}
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white bg-emerald-500 ${selectedConversation?.id === conv.id ? 'hidden' : ''}`}></div>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="font-bold text-gray-900 truncate text-base">{conv.other_user?.full_name || 'User'}</h4>
-                    <span className="text-[10px] text-gray-400 font-medium">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <h4 className={`font-bold truncate text-base ${selectedConversation?.id === conv.id ? 'text-white' : 'text-gray-900'}`}>
+                      {conv.other_user?.full_name || 'User'}
+                    </h4>
+                    <span className={`text-[10px] font-bold uppercase tracking-tighter ${selectedConversation?.id === conv.id ? 'text-emerald-100' : 'text-gray-400'}`}>
                       {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 truncate leading-relaxed">
-                    {conv.unread_count > 0 && <span className="font-bold text-emerald-600 mr-1">New:</span>}
-                    {conv.last_message || 'Start a conversation'}
-                  </p>
-                  <div className="flex items-center gap-1 mt-1 opacity-60">
-                    <Package className="w-3 h-3 text-gray-400" />
-                    <p className="text-[9px] text-gray-400 font-medium truncate uppercase tracking-wider">{conv.listing?.title || 'Unknown Listing'}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-xs truncate leading-relaxed flex-1 ${selectedConversation?.id === conv.id ? 'text-emerald-50' : 'text-gray-500'}`}>
+                      {conv.last_message || 'Start a conversation'}
+                    </p>
+                    {conv.unread_count > 0 && selectedConversation?.id !== conv.id && (
+                      <div className="bg-emerald-500 text-white text-[10px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-sm">
+                        {conv.unread_count}
+                      </div>
+                    )}
                   </div>
                 </div>
               </button>
@@ -406,44 +427,50 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm z-10">
-              <div className="flex items-center gap-3">
+            <div className="px-6 py-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+              <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setSelectedConversation(null)}
-                  className="md:hidden p-2 hover:bg-gray-100 rounded-xl transition-all"
+                  className="md:hidden p-2.5 hover:bg-gray-100 rounded-2xl transition-colors text-gray-500"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                
-                <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shadow-sm border border-gray-50">
-                  {selectedConversation.other_user?.avatar_url ? (
-                    <img src={getOptimizedImageUrl(selectedConversation.other_user.avatar_url, { width: 100, height: 100 })} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <User className="w-5 h-5" />
-                    </div>
-                  )}
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 overflow-hidden border-2 border-white shadow-sm">
+                    {selectedConversation.other_user?.avatar_url ? (
+                      <img src={getOptimizedImageUrl(selectedConversation.other_user.avatar_url, { width: 96, height: 96 })} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <User className="w-6 h-6" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white bg-emerald-500"></div>
                 </div>
-
                 <div>
-                  <h3 className="font-bold text-gray-900 leading-tight text-base">
-                    {selectedConversation.other_user?.full_name || 'User'}
-                  </h3>
+                  <h3 className="font-black text-gray-900 leading-tight text-lg tracking-tight">{selectedConversation.other_user?.full_name || 'User'}</h3>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Active Now</p>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Active Now</p>
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <Package className="w-4 h-4 text-emerald-500" />
-                  <span className="text-[10px] font-bold text-gray-600 truncate max-w-[120px] uppercase tracking-tight">
-                    {selectedConversation.listing?.title}
-                  </span>
-                </div>
-              </div>
+              {selectedConversation.listing && (
+                <button 
+                  onClick={() => window.location.href = `/listings/${selectedConversation.listing?.id}`}
+                  className="flex items-center gap-2.5 px-4 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-100 transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                    <Package className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-left hidden sm:block">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Listing</p>
+                    <p className="text-xs font-bold text-gray-900 truncate max-w-[150px] leading-none">
+                      {selectedConversation.listing.title}
+                    </p>
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* Messages Area */}
@@ -477,21 +504,39 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.2 }}
-                        className={`flex group ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
+                        className={`flex group gap-3 ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
                       >
-                        <div className={`relative max-w-[80%] px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
+                        {!isMe && (
+                          <div className="w-8 h-8 flex-shrink-0 self-end mb-1">
+                            {isFirstInGroup ? (
+                              <div className="w-full h-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+                                {selectedConversation.other_user?.avatar_url ? (
+                                  <img src={getOptimizedImageUrl(selectedConversation.other_user.avatar_url, { width: 64, height: 64 })} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                    <User className="w-4 h-4" />
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="w-8" />
+                            )}
+                          </div>
+                        )}
+
+                        <div className={`relative max-w-[75%] px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
                           isMe 
                             ? `bg-emerald-500 text-white ${
-                                isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tr-none' :
-                                isFirstInGroup ? 'rounded-2xl rounded-tr-none rounded-br-md' :
-                                isLastInGroup ? 'rounded-2xl rounded-tr-md rounded-br-none' :
-                                'rounded-2xl rounded-tr-md rounded-br-md'
+                                isFirstInGroup && isLastInGroup ? 'rounded-[1.5rem] rounded-tr-none' :
+                                isFirstInGroup ? 'rounded-[1.5rem] rounded-tr-none rounded-br-lg' :
+                                isLastInGroup ? 'rounded-[1.5rem] rounded-tr-lg rounded-br-none' :
+                                'rounded-[1.5rem] rounded-tr-lg rounded-br-lg'
                               }`
                             : `bg-white text-gray-800 border border-gray-100 ${
-                                isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-tl-none' :
-                                isFirstInGroup ? 'rounded-2xl rounded-tl-none rounded-bl-md' :
-                                isLastInGroup ? 'rounded-2xl rounded-tl-md rounded-bl-none' :
-                                'rounded-2xl rounded-tl-md rounded-bl-md'
+                                isFirstInGroup && isLastInGroup ? 'rounded-[1.5rem] rounded-tl-none' :
+                                isFirstInGroup ? 'rounded-[1.5rem] rounded-tl-none rounded-bl-lg' :
+                                isLastInGroup ? 'rounded-[1.5rem] rounded-tl-lg rounded-bl-none' :
+                                'rounded-[1.5rem] rounded-tl-lg rounded-bl-lg'
                               }`
                         }`}>
                           {msg.content.includes('[PRODUCT_IMAGE]') ? (
@@ -507,16 +552,23 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                               </div>
                             </div>
                           ) : (
-                            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                           )}
-                          <div className={`flex items-center justify-between gap-4 mt-1 ${!isLastInGroup && 'hidden group-hover:flex'}`}>
-                            <span className={`text-[8px] block ${isMe ? 'text-emerald-100' : 'text-gray-400'}`}>
-                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                          <div className={`flex items-center justify-between gap-4 mt-1.5 ${!isLastInGroup && 'hidden group-hover:flex'}`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[9px] font-bold uppercase tracking-tighter ${isMe ? 'text-emerald-100' : 'text-gray-400'}`}>
+                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {isMe && (
+                                <div className="text-emerald-100">
+                                  {msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                                </div>
+                              )}
+                            </div>
                             <button 
                               onClick={() => handleDeleteMessage(msg.id)}
-                              className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-black/5 ${isMe ? 'text-emerald-100 hover:text-white' : 'text-gray-300 hover:text-red-500'}`}
-                              title="Delete for me"
+                              className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-black/5 ${isMe ? 'text-emerald-100 hover:text-white' : 'text-gray-300 hover:text-red-500'}`}
+                              title="Delete"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -549,7 +601,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
 
             {/* Input Area */}
             <div className="p-4 bg-white border-t border-gray-100">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+              <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-gray-50 p-2 rounded-[2rem] border border-gray-100 focus-within:ring-4 focus-within:ring-emerald-500/5 transition-all">
                 <input 
                   type="text"
                   value={newMessage}
@@ -557,13 +609,13 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                     setNewMessage(e.target.value);
                     handleTyping();
                   }}
-                  placeholder="Type a message..."
-                  className="flex-1 bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  placeholder="Message..."
+                  className="flex-1 bg-transparent border-none py-3 px-4 text-sm font-semibold focus:ring-0 outline-none placeholder:text-gray-400"
                 />
                 <button 
                   type="submit"
                   disabled={!newMessage.trim() || isSending}
-                  className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
+                  className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
                   {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
@@ -571,12 +623,24 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center text-emerald-500 mb-4">
-              <MessageCircle className="w-10 h-10" />
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-white">
+            <div className="relative mb-8">
+              <div className="w-32 h-32 bg-emerald-50 rounded-[3rem] flex items-center justify-center animate-pulse">
+                <MessageCircle className="w-16 h-16 text-emerald-500" />
+              </div>
+              <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-white rounded-2xl shadow-xl flex items-center justify-center border border-gray-50 animate-bounce delay-700">
+                <Send className="w-6 h-6 text-emerald-400" />
+              </div>
             </div>
-            <h3 className="text-xl font-black text-gray-900 mb-2">Your Conversations</h3>
-            <p className="text-gray-500 max-w-xs mx-auto text-sm font-medium">Select a chat from the sidebar to start messaging with buyers and sellers.</p>
+            <h3 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Select a Chat</h3>
+            <p className="text-gray-400 max-w-sm font-bold text-sm leading-relaxed uppercase tracking-widest">
+              Pick a conversation from the left to start messaging instantly.
+            </p>
+            <div className="mt-10 flex items-center gap-4 opacity-20 grayscale">
+              <div className="w-10 h-10 rounded-xl bg-gray-200"></div>
+              <div className="w-10 h-10 rounded-xl bg-gray-200"></div>
+              <div className="w-10 h-10 rounded-xl bg-gray-200"></div>
+            </div>
           </div>
         )}
       </div>
