@@ -22,6 +22,7 @@ export interface Listing {
   postedAt?: string;
   status?: 'active' | 'sold' | 'pending' | 'hidden' | 'deleted';
   views?: number;
+  likes_count?: number;
   isFavorited?: boolean;
 }
 

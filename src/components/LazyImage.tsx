@@ -1,4 +1,4 @@
-import { useState, useEffect, ImgHTMLAttributes, HTMLAttributeReferrerPolicy } from 'react';
+import { useState, useEffect, useRef, ImgHTMLAttributes, HTMLAttributeReferrerPolicy } from 'react';
 
 interface LazyImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   src?: string;
@@ -15,21 +15,27 @@ export const LazyImage = ({
   fallbackSrc,
   ...props 
 }: LazyImageProps) => {
-  const [imgSrc, setImgSrc] = useState<string | undefined>(undefined);
+  const [isInView, setIsInView] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!src) {
-      setIsLoading(false);
-      setHasError(true);
-      return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' } // Start loading 200px before it enters the viewport
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
     }
 
-    setIsLoading(true);
-    setHasError(false);
-    setImgSrc(src);
-
+    return () => observer.disconnect();
   }, [src]);
 
   const handleError = () => {
@@ -42,12 +48,16 @@ export const LazyImage = ({
   };
 
   return (
-    <div className={`relative overflow-hidden bg-gray-100/50 ${className}`}>
+    <div 
+      ref={imgRef}
+      className={`relative overflow-hidden bg-gray-100/50 ${className}`}
+    >
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-          <div className="w-5 h-5 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+        <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
         </div>
       )}
+      
       {hasError ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-gray-50">
           <div className="text-gray-300 mb-1">
@@ -58,17 +68,18 @@ export const LazyImage = ({
           <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">No Image</span>
         </div>
       ) : (
-        <img
-          src={imgSrc}
-          alt={alt}
-          onLoad={handleLoad}
-          onError={handleError}
-          loading="lazy"
-          className={`w-full h-full object-cover transition-all duration-200 ease-out ${
-            isLoading ? 'opacity-0 scale-[1.02] blur-sm' : 'opacity-100 scale-100 blur-0'
-          }`}
-          {...props}
-        />
+        isInView && (
+          <img
+            src={src}
+            alt={alt}
+            onLoad={handleLoad}
+            onError={handleError}
+            className={`w-full h-full object-cover transition-all duration-700 ease-out ${
+              isLoading ? 'opacity-0 scale-105 blur-lg' : 'opacity-100 scale-100 blur-0'
+            }`}
+            {...props}
+          />
+        )
       )}
     </div>
   );

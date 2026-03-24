@@ -1,7 +1,24 @@
 import { useState, useRef, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle2, Tag, Upload, MapPin, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, Tag, Upload, MapPin, Loader2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../lib/supabase';
 import { api, Listing } from '../services/api';
 import { ETHIOPIAN_LOCATIONS } from '../constants/locations';
@@ -12,6 +29,54 @@ interface PostAdModalProps {
   onSuccess?: () => void;
   editListing?: Listing | null;
 }
+
+const SortablePhoto = ({ url, index, onRemove }: { url: string, index: number, onRemove: (index: number) => void }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: url });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={`relative aspect-square rounded-2xl overflow-hidden group shadow-sm ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <img src={url} alt="Preview" className="w-full h-full object-cover" />
+      
+      {/* Drag Handle Overlay */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="w-6 h-6 text-white drop-shadow-md" />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onRemove(index)}
+        className="absolute top-1 right-1 p-1 bg-red-500/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 z-20"
+      >
+        <X className="w-3 h-3" />
+      </button>
+      
+      {index === 0 && (
+        <div className="absolute bottom-0 inset-x-0 bg-emerald-500 text-white text-[8px] font-black py-0.5 text-center uppercase z-10">Main Photo</div>
+      )}
+    </div>
+  );
+};
 
 const ETHIOPIAN_REGIONS = ETHIOPIAN_LOCATIONS.map(l => l.name);
 
@@ -30,6 +95,17 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   const [selectedMainCategory, setSelectedMainCategory] = useState<string>('');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('');
   
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const [formData, setFormData] = useState({
     title: editListing?.title || '',
     category: editListing?.category_id ? String(editListing.category_id) : '',
@@ -190,11 +266,72 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   };
 
   const removeFile = (index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    setSelectedFiles(newFiles);
+    // We need to find if this preview was a local file or an existing remote image
+    const previewToRemove = previews[index];
     
-    const newPreviews = previews.filter((_, i) => i !== index);
-    setPreviews(newPreviews);
+    // Check if it's an object URL (local file)
+    const isLocal = previewToRemove.startsWith('blob:');
+    
+    if (isLocal) {
+      // Find which file it corresponds to
+      // This is tricky if we don't store the mapping. 
+      // Let's assume the order in selectedFiles matches the order of blob: URLs in previews.
+      // Actually, let's just filter both based on the index if we can.
+      
+      // Better approach: filter previews, and if it was a local file, filter selectedFiles too.
+      // Since we always keep them in sync during selection and drag, the relative order of local files
+      // in selectedFiles should match their relative order in previews.
+      
+      const localPreviewsBefore = previews.slice(0, index).filter(p => p.startsWith('blob:'));
+      const fileIndex = localPreviewsBefore.length;
+      
+      setSelectedFiles(prev => prev.filter((_, i) => i !== fileIndex));
+    }
+
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+    URL.revokeObjectURL(previewToRemove);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setPreviews((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        
+        const newPreviews = arrayMove(items, oldIndex, newIndex);
+        
+        // Also need to sync selectedFiles if any of these were local files
+        // This is complex because selectedFiles only contains NEW files, 
+        // while previews contains both new and existing.
+        
+        // Let's rebuild selectedFiles based on the new order of local previews
+        const newLocalPreviews = newPreviews.filter(p => p.startsWith('blob:'));
+        const newSelectedFiles: File[] = [];
+        
+        newLocalPreviews.forEach(blobUrl => {
+          // Find the file that matches this blobUrl
+          // We can't easily do this unless we stored the mapping.
+          // Let's just use the original mapping before move.
+          
+          // Actually, a simpler way: 
+          // 1. Get all local previews in their OLD order.
+          // 2. Map them to selectedFiles.
+          // 3. Get all local previews in their NEW order.
+          // 4. Reconstruct selectedFiles.
+          
+          const oldLocalPreviews = previews.filter(p => p.startsWith('blob:'));
+          const fileIdx = oldLocalPreviews.indexOf(blobUrl);
+          if (fileIdx !== -1) {
+            newSelectedFiles.push(selectedFiles[fileIdx]);
+          }
+        });
+        
+        setSelectedFiles(newSelectedFiles);
+        return newPreviews;
+      });
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -341,23 +478,23 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white w-full sm:max-w-2xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[90vh]"
+            className="relative bg-white w-full sm:max-w-2xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[95vh]"
           >
           {/* Header */}
-          <div className="p-4 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div className="p-5 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
             <div>
-              <h2 className="text-xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                {editListing ? 'Edit Your Ad' : 'Post Your Ad'}
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-none">
+                {editListing ? 'Edit Ad' : 'Post Ad'}
               </h2>
-              <p className="text-xs sm:text-sm text-gray-500 font-medium">
-                {editListing ? 'Update your listing details' : 'Reach millions of buyers in seconds'}
+              <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">
+                {editListing ? 'Update your listing details' : 'List your item in seconds'}
               </p>
             </div>
             <button 
               onClick={onClose}
-              className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all active:scale-95"
             >
-              <X className="w-6 h-6 text-gray-400" />
+              <X className="w-6 h-6 text-gray-500" />
             </button>
           </div>
 
@@ -384,16 +521,19 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                   </div>
                 )}
                 {/* Step 1: Category & Photos */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">1. Select Category</label>
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-black text-sm">1</div>
+                    <label className="text-sm font-black text-gray-900 uppercase tracking-widest">Category & Photos</label>
+                  </div>
                   
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Main Category Dropdown */}
                     <div className="relative group">
                       <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                       <select
                         required
-                        className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium appearance-none cursor-pointer"
+                        className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm"
                         value={selectedMainCategory}
                         onChange={(e) => {
                           setSelectedMainCategory(e.target.value);
@@ -401,54 +541,46 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                         }}
                         disabled={categoriesLoading}
                       >
-                        <option value="">{categoriesLoading ? 'Loading categories...' : 'Select Main Category'}</option>
+                        <option value="">{categoriesLoading ? 'Loading...' : 'Main Category'}</option>
                         {categories.filter(c => !c.parent_id).map((cat, idx) => (
                           <option key={cat.id || idx} value={cat.id}>
-                            {cat.icon} {cat.name}
+                            {cat.name}
                           </option>
                         ))}
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                     </div>
 
                     {/* Sub Category Dropdown */}
-                    <AnimatePresence>
-                      {selectedMainCategory && categories.some(c => String(c.parent_id) === selectedMainCategory) && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="relative group"
-                        >
-                          <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                          <select
-                            required
-                            className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium appearance-none cursor-pointer"
-                            value={selectedSubCategory}
-                            onChange={(e) => setSelectedSubCategory(e.target.value)}
-                          >
-                            <option value="">Select Sub-Category</option>
-                            {categories
-                              .filter(c => String(c.parent_id) === selectedMainCategory)
-                              .map((sub, idx) => (
-                                <option key={sub.id || idx} value={sub.id}>
-                                  {sub.icon} {sub.name}
-                                </option>
-                              ))}
-                            <option value="other">Other / Uncategorized</option>
-                          </select>
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <div className="relative group">
+                      <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                      <select
+                        required
+                        disabled={!selectedMainCategory || !categories.some(c => String(c.parent_id) === selectedMainCategory)}
+                        className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm disabled:opacity-50"
+                        value={selectedSubCategory}
+                        onChange={(e) => setSelectedSubCategory(e.target.value)}
+                      >
+                        <option value="">Sub-Category</option>
+                        {categories
+                          .filter(c => String(c.parent_id) === selectedMainCategory)
+                          .map((sub, idx) => (
+                            <option key={sub.id || idx} value={sub.id}>
+                              {sub.name}
+                            </option>
+                          ))}
+                        {selectedMainCategory && <option value="other">Other</option>}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
 
                   {categories.length === 0 && !categoriesLoading && (
@@ -484,122 +616,148 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                 </div>
 
                 <div className="space-y-6">
-                  <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">2. Add Photos ({selectedFiles.length}/5)</label>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
-                    <input 
-                      type="file" 
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                    />
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-emerald-500 hover:text-emerald-500 cursor-pointer transition-all bg-gray-50"
-                    >
-                      <Upload className="w-8 h-8" />
-                      <span className="text-[10px] font-bold">ADD PHOTO</span>
+                  <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">2. Add Photos ({previews.length}/5)</label>
+                  <p className="text-[10px] text-gray-400 font-medium -mt-4 italic">Tip: Drag photos to rearrange. The first photo will be the main cover.</p>
+                  
+                  <DndContext 
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                      />
+                      <button 
+                        type="button"
+                        disabled={previews.length >= 5}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-50/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Upload className="w-6 h-6" />
+                        <span className="text-[9px] font-black uppercase">Add</span>
+                      </button>
+                      
+                      <SortableContext 
+                        items={previews}
+                        strategy={rectSortingStrategy}
+                      >
+                        {previews.map((preview, index) => (
+                          <SortablePhoto 
+                            key={preview} 
+                            url={preview} 
+                            index={index} 
+                            onRemove={removeFile} 
+                          />
+                        ))}
+                      </SortableContext>
                     </div>
-                    
-                    {previews.map((preview, index) => (
-                      <div key={index} className="relative aspect-square rounded-2xl overflow-hidden group">
-                        <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  </DndContext>
                 </div>
 
                 {/* Step 2: Details */}
                 <div className="space-y-6">
-                  <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">3. Item Details</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm">2</div>
+                    <label className="text-sm font-black text-gray-900 uppercase tracking-widest">Item Details</label>
+                  </div>
+
                   <div className="space-y-4">
-                    <div className="relative">
-                      <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <div className="relative group">
+                      <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
                       <input
                         type="text"
                         required
                         placeholder="Ad Title (e.g. iPhone 15 Pro Max)"
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold text-sm"
                         value={formData.title}
                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">Br</span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Price First */}
+                      <div className="relative group">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 group-focus-within:text-orange-500 transition-colors text-sm">Br</span>
                         <input
                           type="number"
                           required
                           placeholder="Price"
-                          className="w-full pl-10 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium"
+                          className="w-full pl-10 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold text-sm"
                           value={formData.price}
                           onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         />
                       </div>
-                      <div className="space-y-4">
-                        <div className="relative group">
-                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+
+                      {/* Region */}
+                      <div className="relative group">
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                        <select
+                          required
+                          className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm"
+                          value={selectedRegion}
+                          onChange={(e) => {
+                            setSelectedRegion(e.target.value);
+                            setSelectedSubRegion('');
+                          }}
+                        >
+                          <option value="">Select Region</option>
+                          {ETHIOPIAN_LOCATIONS.map((loc) => (
+                            <option key={loc.name} value={loc.name}>
+                              {loc.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sub-region (Full width on mobile, or side-by-side if we wanted, but full width is cleaner for long names) */}
+                    <AnimatePresence>
+                      {selectedRegion && ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="relative group"
+                        >
+                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
                           <select
                             required
-                            className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium appearance-none cursor-pointer"
-                            value={selectedRegion}
-                            onChange={(e) => {
-                              setSelectedRegion(e.target.value);
-                              setSelectedSubRegion(''); // Reset sub-region when region changes
-                            }}
+                            className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm"
+                            value={selectedSubRegion}
+                            onChange={(e) => setSelectedSubRegion(e.target.value)}
                           >
-                            <option value="">Select Region</option>
-                            {ETHIOPIAN_LOCATIONS.map((loc) => (
-                              <option key={loc.name} value={loc.name}>
-                                {loc.name}
+                            <option value="">Select Sub-Region / City</option>
+                            {ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions?.map((sub) => (
+                              <option key={sub} value={sub}>
+                                {sub}
                               </option>
                             ))}
                           </select>
                           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                             </svg>
                           </div>
-                        </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                        {selectedRegion && ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions && (
-                          <div className="relative group">
-                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                            <select
-                              required
-                              className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium appearance-none cursor-pointer"
-                              value={selectedSubRegion}
-                              onChange={(e) => setSelectedSubRegion(e.target.value)}
-                            >
-                              <option value="">Select Sub-Region / City</option>
-                              {ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions?.map((sub) => (
-                                <option key={sub} value={sub}>
-                                  {sub}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                     <textarea
                       required
-                      placeholder="Describe what you are selling..."
+                      placeholder="Tell buyers more about your item..."
                       rows={4}
-                      className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-medium resize-none"
+                      className="w-full p-5 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-[2rem] outline-none transition-all font-semibold text-sm resize-none"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     />
@@ -607,19 +765,19 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                 </div>
 
                 {/* Footer */}
-                <div className="pt-4">
+                <div className="pt-6 sticky bottom-0 bg-white/80 backdrop-blur-md -mx-4 sm:-mx-8 px-4 sm:px-8 pb-4">
                   <button 
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-orange-500/30 hover:bg-orange-600 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:scale-100"
+                    className="w-full bg-orange-500 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl shadow-orange-500/30 hover:bg-orange-600 transition-all active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
                   >
                     {loading ? (
                       <>
                         <Loader2 className="w-6 h-6 animate-spin" />
-                        <span>{editListing ? 'UPDATING...' : 'POSTING...'}</span>
+                        <span className="tracking-widest uppercase">{editListing ? 'Updating...' : 'Posting...'}</span>
                       </>
                     ) : (
-                      <span>{editListing ? 'UPDATE AD NOW' : 'POST AD NOW'}</span>
+                      <span className="tracking-widest uppercase">{editListing ? 'Update Ad' : 'Post Ad Now'}</span>
                     )}
                   </button>
                 </div>

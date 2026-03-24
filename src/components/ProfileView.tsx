@@ -8,11 +8,13 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { ETHIOPIAN_LOCATIONS } from '../constants/locations';
 
 interface ProfileViewProps {
+  user: any;
   onLogout: () => void;
+  onLogoutSuccess: () => void;
   onBack: () => void;
 }
 
-export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
+export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack }: ProfileViewProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -26,12 +28,21 @@ export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
   const [selectedSubRegion, setSelectedSubRegion] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [user]);
 
   const fetchProfile = async () => {
     setIsLoading(true);
@@ -142,7 +153,7 @@ export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
 
       await api.users.deleteMe(session.access_token);
       await supabase.auth.signOut();
-      onLogout();
+      onLogoutSuccess();
     } catch (err) {
       console.error('Error deleting account:', err);
       setError('Failed to delete account. Please try again.');
@@ -162,87 +173,139 @@ export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 pb-24">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50/50 pb-32">
+      {/* Mobile Sticky Header - Hidden on Desktop to prevent overlapping */}
+      <header 
+        className={`fixed top-0 left-0 right-0 z-[100] lg:hidden transition-all duration-300 px-4 py-3 flex items-center justify-between ${
+          isScrolled ? 'bg-white/80 backdrop-blur-xl shadow-sm' : 'bg-transparent'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onBack}
+            className={`p-2 rounded-2xl transition-all ${
+              isScrolled ? 'bg-gray-100 text-gray-900' : 'bg-white/20 backdrop-blur-md text-white'
+            }`}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className={`text-lg font-black tracking-tight transition-all ${
+            isScrolled ? 'opacity-100 text-gray-900' : 'opacity-0'
+          }`}>
+            Profile
+          </h1>
+        </div>
+        <button 
+          onClick={onLogout}
+          className={`p-2 rounded-2xl transition-all ${
+            isScrolled ? 'bg-red-50 text-red-500' : 'bg-white/20 backdrop-blur-md text-white'
+          }`}
+        >
+          <LogOut className="w-5 h-5" />
+        </button>
+      </header>
+
+      {/* Desktop Header - Visible only on Desktop */}
+      <div className="hidden lg:flex items-center justify-between max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-4">
           <button 
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-all"
+            className="p-2 hover:bg-gray-100 rounded-2xl transition-all text-gray-900"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Account Settings</h2>
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Account Settings</h1>
             <p className="text-gray-500 text-sm font-medium">Manage your personal information</p>
           </div>
         </div>
         <button 
           onClick={onLogout}
-          className="flex items-center gap-2 text-red-500 font-bold text-sm hover:bg-red-50 px-4 py-2 rounded-xl transition-all"
+          className="flex items-center gap-2 text-red-500 font-bold hover:bg-red-50 px-4 py-2 rounded-2xl transition-all"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-5 h-5" />
           Log Out
         </button>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-emerald-500 to-emerald-600 relative">
-          <div className="absolute -bottom-12 left-8">
-            <div className="relative group">
-              <div className="w-24 h-24 rounded-[2rem] bg-white p-1 shadow-xl">
-                <div className="w-full h-full rounded-[1.8rem] overflow-hidden bg-gray-100">
-                  {isUploading ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                      <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-                    </div>
-                  ) : avatarUrl ? (
-                    <img 
-                      src={getOptimizedImageUrl(avatarUrl, { width: 200, height: 200 })} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <User className="w-10 h-10" />
-                    </div>
-                  )}
-                </div>
+      {/* Hero Section */}
+      <div className="relative h-72 sm:h-80 bg-emerald-500 overflow-hidden lg:rounded-[3rem] lg:max-w-4xl lg:mx-auto lg:mt-4">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center pt-8">
+          <div className="relative group">
+            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-[2.5rem] bg-white p-1 shadow-2xl">
+              <div className="w-full h-full rounded-[2.3rem] overflow-hidden bg-gray-100 relative">
+                {isUploading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10">
+                    <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                  </div>
+                ) : avatarUrl ? (
+                  <img 
+                    src={getOptimizedImageUrl(avatarUrl, { width: 300, height: 300 })} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                    <User className="w-12 h-12" />
+                  </div>
+                )}
               </div>
-              <label className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-xl shadow-lg flex items-center justify-center text-gray-600 hover:text-emerald-500 transition-all border border-gray-100 cursor-pointer">
-                <Camera className="w-4 h-4" />
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  disabled={isUploading}
-                />
-              </label>
             </div>
+            <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-2xl shadow-xl flex items-center justify-center text-emerald-500 hover:scale-110 transition-all cursor-pointer border border-gray-100 z-20">
+              <Camera className="w-5 h-5" />
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={isUploading}
+              />
+            </label>
           </div>
+          <h2 className="mt-4 text-2xl font-black text-white tracking-tight">{fullName || 'Your Name'}</h2>
+          <p className="text-emerald-100 text-sm font-medium">{profile?.email}</p>
         </div>
+      </div>
 
-        <div className="pt-16 pb-8 px-8">
-          <form onSubmit={handleUpdateProfile} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 text-sm font-medium">
-                <AlertCircle className="w-5 h-5 shrink-0" />
-                {error}
-              </div>
-            )}
+      <div className="max-w-2xl mx-auto px-4 -mt-10 relative z-10">
+        <form onSubmit={handleUpdateProfile} className="space-y-6">
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-50 text-red-600 p-4 rounded-3xl flex items-center gap-3 text-sm font-bold border border-red-100"
+            >
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              {error}
+            </motion.div>
+          )}
 
-            {success && (
-              <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl flex items-center gap-3 text-sm font-medium">
-                <CheckCircle2 className="w-5 h-5 shrink-0" />
-                Profile updated successfully!
+          {success && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-emerald-50 text-emerald-600 p-4 rounded-3xl flex items-center gap-3 text-sm font-bold border border-emerald-100"
+            >
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              Profile updated successfully!
+            </motion.div>
+          )}
+
+          {/* Personal Info Section */}
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-sm border border-gray-100 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <User className="w-4 h-4" />
               </div>
-            )}
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Personal Info</h3>
+            </div>
 
             <div className="grid gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <div className="relative group">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                   <input 
                     type="text"
                     value={fullName}
@@ -256,8 +319,8 @@ export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <div className="relative group">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                   <input 
                     type="tel"
                     value={phone}
@@ -267,7 +330,19 @@ export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
                   />
                 </div>
               </div>
+            </div>
+          </div>
 
+          {/* Location Section */}
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-sm border border-gray-100 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Location</h3>
+            </div>
+
+            <div className="grid gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Region</label>
                 <div className="relative group">
@@ -322,52 +397,68 @@ export const ProfileView = ({ onLogout, onBack }: ProfileViewProps) => {
                   </div>
                 </div>
               )}
-
-              <div className="space-y-2 opacity-60">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address (Read-only)</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input 
-                    type="email"
-                    value={profile?.email || ''}
-                    disabled
-                    className="w-full bg-gray-100 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-gray-500 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button 
-              type="submit"
-              disabled={isSaving}
-              className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Profile'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-12 pt-8 border-t border-gray-100">
-            <div className="flex flex-col gap-4">
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Danger Zone</h3>
-              <p className="text-xs text-gray-500 font-medium">
-                Once you delete your account, there is no going back. Please be certain.
-              </p>
-              <button 
-                onClick={() => setShowDeleteModal(true)}
-                className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl border-2 border-red-100 text-red-500 font-black uppercase tracking-widest hover:bg-red-50 transition-all active:scale-[0.98]"
-              >
-                <Trash2 className="w-5 h-5" />
-                Delete My Account
-              </button>
             </div>
           </div>
+
+          {/* Account Security Section */}
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-sm border border-gray-100 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <Mail className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Account Security</h3>
+            </div>
+
+            <div className="space-y-2 opacity-60">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address (Read-only)</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input 
+                  type="email"
+                  value={profile?.email || ''}
+                  disabled
+                  className="w-full bg-gray-100 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-gray-500 cursor-not-allowed"
+                />
+              </div>
+            </div>
+          </div>
+
+          <button 
+            type="submit"
+            disabled={isSaving}
+            className="w-full bg-emerald-500 text-white py-5 rounded-3xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </button>
+        </form>
+
+        {/* Danger Zone */}
+        <div className="mt-12 mb-20 p-8 bg-red-50/50 rounded-[2.5rem] border border-red-100 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-black text-red-900 uppercase tracking-widest">Danger Zone</h3>
+          </div>
+          
+          <p className="text-xs text-red-600/70 font-bold leading-relaxed">
+            Once you delete your account, there is no going back. All your listings, messages, and profile data will be permanently removed.
+          </p>
+          
+          <button 
+            onClick={() => setShowDeleteModal(true)}
+            className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white text-red-500 font-black uppercase tracking-widest hover:bg-red-50 transition-all active:scale-[0.98] border border-red-100 shadow-sm shadow-red-500/5"
+          >
+            <Trash2 className="w-5 h-5" />
+            Delete My Account
+          </button>
         </div>
       </div>
 

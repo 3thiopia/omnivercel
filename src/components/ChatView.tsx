@@ -336,7 +336,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto h-[calc(100vh-9rem)] md:h-[calc(100vh-12rem)] flex bg-white rounded-none md:rounded-[2.5rem] border-none md:border border-gray-100 shadow-none md:shadow-sm overflow-hidden">
+    <div className="w-full max-w-6xl mx-auto h-[calc(100vh-3.5rem)] md:h-[calc(100vh-12rem)] flex bg-white rounded-none md:rounded-[2.5rem] border-none md:border border-gray-100 shadow-none md:shadow-sm overflow-hidden">
       {/* Sidebar */}
       <div className={`w-full md:w-96 border-r border-gray-100 flex flex-col bg-white ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 md:p-6 border-b border-gray-100">
@@ -600,7 +600,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
             </div>
 
             {/* Input Area */}
-            <div className="p-3 md:p-4 bg-white border-t border-gray-100">
+            <div className="p-3 pb-10 md:p-4 bg-white border-t border-gray-100">
               <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-2 md:gap-3 bg-gray-50 p-1.5 md:p-2 rounded-[2rem] border border-gray-100 focus-within:ring-4 focus-within:ring-emerald-500/5 transition-all">
                 <input 
                   type="text"

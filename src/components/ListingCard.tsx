@@ -14,17 +14,18 @@ interface ListingCardProps {
   categoryIcon?: string;
   isPromoted?: boolean;
   isFavorited?: boolean;
+  likesCount?: number;
   viewMode?: 'grid' | 'list';
   key?: Key;
   onClick?: () => void;
   onFavorite?: (e: React.MouseEvent) => void;
 }
 
-export const ListingCard = ({ title, price, location, image, category, categoryIcon, isPromoted, isFavorited, viewMode = 'grid', onClick, onFavorite }: ListingCardProps) => {
-  const optimizedImage = getOptimizedImageUrl(image, { 
+export const ListingCard = React.memo(({ title, price, location, image, category, categoryIcon, isPromoted, isFavorited, likesCount, viewMode = 'grid', onClick, onFavorite }: ListingCardProps) => {
+  const optimizedImage = React.useMemo(() => getOptimizedImageUrl(image, { 
     width: viewMode === 'grid' ? 300 : 200,
     height: viewMode === 'grid' ? 225 : 150
-  });
+  }), [image, viewMode]);
 
   if (viewMode === 'grid') {
     return (
@@ -42,15 +43,6 @@ export const ListingCard = ({ title, price, location, image, category, categoryI
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             referrerPolicy="no-referrer"
           />
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onFavorite?.(e);
-            }}
-            className={`absolute top-3 right-3 p-2 backdrop-blur-sm rounded-full transition-colors ${isFavorited ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-400 hover:text-red-500'}`}
-          >
-            <Heart className={`w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
-          </button>
           {isPromoted && (
             <div className="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" />
@@ -65,9 +57,23 @@ export const ListingCard = ({ title, price, location, image, category, categoryI
               <span className="truncate">{category}</span>
             </div>
           )}
-          <h3 className="font-bold text-gray-800 text-xs sm:text-base line-clamp-2 mb-1 sm:mb-2 group-hover:text-emerald-600 transition-colors leading-tight">
-            {title}
-          </h3>
+          <div className="flex justify-between items-start gap-2 mb-1 sm:mb-2">
+            <h3 className="font-bold text-gray-800 text-xs sm:text-base line-clamp-2 group-hover:text-emerald-600 transition-colors leading-tight flex-1">
+              {title}
+            </h3>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavorite?.(e);
+              }}
+              className={`flex items-center gap-1 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+            >
+              {likesCount !== undefined && likesCount > 0 && (
+                <span className="text-[10px] font-black">{likesCount}</span>
+              )}
+              <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+            </button>
+          </div>
           <div className="flex flex-col gap-0.5 sm:gap-1">
             <span className="text-sm sm:text-xl font-black text-emerald-600">
               Br {price.toLocaleString()}
@@ -112,9 +118,23 @@ export const ListingCard = ({ title, price, location, image, category, categoryI
               <span className="truncate">{category}</span>
             </div>
           )}
-          <h3 className="font-bold text-gray-800 text-sm sm:text-lg line-clamp-1 group-hover:text-emerald-600 transition-colors">
-            {title}
-          </h3>
+          <div className="flex justify-between items-start gap-2">
+            <h3 className="font-bold text-gray-800 text-sm sm:text-lg line-clamp-1 group-hover:text-emerald-600 transition-colors flex-1">
+              {title}
+            </h3>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavorite?.(e);
+              }}
+              className={`flex items-center gap-1 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+            >
+              {likesCount !== undefined && likesCount > 0 && (
+                <span className="text-[10px] sm:text-xs font-black">{likesCount}</span>
+              )}
+              <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+            </button>
+          </div>
           <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 uppercase font-bold tracking-wider">
             <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
             <span className="truncate">{location}</span>
@@ -124,17 +144,8 @@ export const ListingCard = ({ title, price, location, image, category, categoryI
           <span className="text-base sm:text-xl font-black text-emerald-600">
             Br {price.toLocaleString()}
           </span>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onFavorite?.(e);
-            }}
-            className={`p-1 sm:p-2 transition-colors ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
-          >
-            <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
-          </button>
         </div>
       </div>
     </motion.div>
   );
-};
+});

@@ -12,12 +12,13 @@ import { ListingCard } from './ListingCard';
 import { ConfirmationModal } from './ConfirmationModal';
 
 interface MyListingsProps {
+  user: any;
   onBack: () => void;
   onViewProduct: (listing: Listing) => void;
   onEditProfile: () => void;
 }
 
-export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsProps) => {
+export const MyListings = ({ user, onBack, onViewProduct, onEditProfile }: MyListingsProps) => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [favorites, setFavorites] = useState<Listing[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -48,7 +49,7 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const fetchFavorites = useCallback(async () => {
     setIsLoading(true);
@@ -68,7 +69,7 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
@@ -88,7 +89,7 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const handleLikeReview = async (reviewId: string, currentLiked: boolean) => {
     try {
@@ -226,51 +227,51 @@ export const MyListings = ({ onBack, onViewProduct, onEditProfile }: MyListingsP
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">My Items</h2>
-          <p className="text-gray-500 text-sm font-medium">Manage your listed products</p>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">My Items</h2>
+          <p className="text-gray-500 text-xs sm:text-sm font-medium">Manage your listed products</p>
         </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={onEditProfile}
-            className="flex items-center gap-2 bg-gray-50 text-gray-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 transition-all"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gray-50 text-gray-600 px-4 py-2.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold hover:bg-gray-100 transition-all border border-gray-100"
           >
-            <User className="w-4 h-4" />
+            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Edit Profile
           </button>
           <button 
             onClick={activeSubTab === 'my-items' ? fetchMyListings : fetchFavorites}
-            className="p-2 text-gray-400 hover:text-emerald-500 transition-all"
+            className="p-2.5 sm:p-2 text-gray-400 hover:text-emerald-500 transition-all bg-gray-50 sm:bg-transparent rounded-xl border border-gray-100 sm:border-none"
             title="Refresh"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveSubTab('my-items')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${activeSubTab === 'my-items' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
+          className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 rounded-xl text-[11px] sm:text-sm font-black transition-all ${activeSubTab === 'my-items' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          <Package className="w-4 h-4" />
-          My Items
+          <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          Items
         </button>
         <button
           onClick={() => setActiveSubTab('favorites')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${activeSubTab === 'favorites' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
+          className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 rounded-xl text-[11px] sm:text-sm font-black transition-all ${activeSubTab === 'favorites' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          <Heart className="w-4 h-4" />
-          My Favourites
+          <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          Favourites
         </button>
         <button
           onClick={() => setActiveSubTab('reviews')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${activeSubTab === 'reviews' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
+          className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 rounded-xl text-[11px] sm:text-sm font-black transition-all ${activeSubTab === 'reviews' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          <Star className="w-4 h-4" />
-          My Reviews
+          <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          Reviews
         </button>
       </div>
 

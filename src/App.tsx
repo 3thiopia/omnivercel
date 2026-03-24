@@ -1,23 +1,29 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, lazy, Suspense, useMemo, useCallback } from 'react';
 import { CategoryBar } from './components/CategoryBar';
 import { ListingCard } from './components/ListingCard';
 import { PostAdModal } from './components/PostAdModal';
 import { AuthModal } from './components/AuthModal';
-import { ProductDetail } from './components/ProductDetail';
-import { AdminDashboard } from './components/AdminDashboard';
-import { MyListings } from './components/MyListings';
-import { ProfileView } from './components/ProfileView';
-import { ChatView } from './components/ChatView';
 import { BottomNav } from './components/BottomNav';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { api, Listing, UserProfile } from './services/api';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETHIOPIAN_LOCATIONS } from './constants/locations';
-import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin } from 'lucide-react';
+import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { getOptimizedImageUrl } from './lib/imageUtils';
 import { PhoneVerificationModal } from './components/PhoneVerificationModal';
+
+// Lazy load heavy components
+const ProductDetail = lazy(() => import('./components/ProductDetail').then(m => ({ default: m.ProductDetail })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const MyListings = lazy(() => import('./components/MyListings').then(m => ({ default: m.MyListings })));
+const ProfileView = lazy(() => import('./components/ProfileView').then(m => ({ default: m.ProfileView })));
+const ChatView = lazy(() => import('./components/ChatView').then(m => ({ default: m.ChatView })));
+
+// Simple cache for listings
+const listingsCache = new Map<string, { data: Listing[], timestamp: number }>();
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 
 export default function App() {
   const [isPostAdOpen, setIsPostAdOpen] = useState(false);
@@ -29,6 +35,9 @@ export default function App() {
   const [isAdminView, setIsAdminView] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
@@ -37,7 +46,7 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<'created_at' | 'price'>('created_at');
+  const [sortBy, setSortBy] = useState<'created_at' | 'price' | 'likes_count'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
@@ -45,6 +54,7 @@ export default function App() {
   const [regionFilter, setRegionFilter] = useState<string>('');
   const [subRegionFilter, setSubRegionFilter] = useState<string>('');
   const [isDeletingListing, setIsDeletingListing] = useState<string | number | null>(null);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   useEffect(() => {
     if (isAdminView && userProfile && userProfile.role !== 'admin') {
@@ -148,8 +158,35 @@ export default function App() {
     }
   };
 
-  const fetchListings = async () => {
-    setIsLoading(true);
+  // Generate a unique cache key based on filters
+  const cacheKey = useMemo(() => {
+    return JSON.stringify({
+      selectedCategory,
+      sortBy,
+      sortOrder,
+      minPrice,
+      maxPrice,
+      locationFilter,
+      page
+    });
+  }, [selectedCategory, sortBy, sortOrder, minPrice, maxPrice, locationFilter, page]);
+
+  const fetchListings = useCallback(async (isLoadMore = false) => {
+    if (isLoadMore) {
+      setIsFetchingMore(true);
+    } else {
+      setIsLoading(true);
+      setPage(1);
+      
+      // Check cache first
+      const cached = listingsCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+        setListings(cached.data);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const data = await api.listings.getAll({ 
@@ -159,27 +196,47 @@ export default function App() {
         order: sortOrder,
         min_price: minPrice ? parseFloat(minPrice) : undefined,
         max_price: maxPrice ? parseFloat(maxPrice) : undefined,
-        location: locationFilter || undefined
+        location: locationFilter || undefined,
+        page: isLoadMore ? page + 1 : 1,
+        limit: 20
       }, session?.access_token);
-      setListings(data);
-    } catch (error) {
-      console.error('Error fetching listings:', error);
+      
+      if (isLoadMore) {
+        setListings(prev => [...prev, ...data]);
+        setPage(prev => prev + 1);
+      } else {
+        setListings(data);
+        // Update cache
+        listingsCache.set(cacheKey, { data, timestamp: Date.now() });
+      }
+      
+      setHasMore(data.length === 20);
+    } catch (err) {
+      console.error('Error fetching listings:', err);
+      toast.error('Failed to load listings');
     } finally {
       setIsLoading(false);
+      setIsFetchingMore(false);
     }
-  };
+  }, [selectedCategory, searchQuery, sortBy, sortOrder, minPrice, maxPrice, locationFilter, page, cacheKey]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
+    listingsCache.clear(); // Clear cache on new search
     fetchListings();
   };
 
   // Refetch when sorting, category, or user changes
   useEffect(() => {
     if (activeTab === 'home') {
+      // When "Most Liked" is selected, default to descending order
+      if (sortBy === 'likes_count' && sortOrder === 'asc') {
+        setSortOrder('desc');
+        return; // The next effect cycle will trigger fetchListings
+      }
       fetchListings();
     }
-  }, [selectedCategory, sortBy, sortOrder, user]);
+  }, [selectedCategory, sortBy, sortOrder, user, activeTab]);
 
   const handleSellClick = () => {
     if (!user) {
@@ -204,12 +261,23 @@ export default function App() {
       const { favorited } = await api.listings.toggleFavorite(listingId, session.access_token);
       
       // Update local state
-      setListings((prev: Listing[]) => prev.map(l => l.id === listingId ? { ...l, isFavorited: favorited } : l));
+      setListings((prev: Listing[]) => prev.map(l => l.id === listingId ? { 
+        ...l, 
+        isFavorited: favorited,
+        likes_count: (l.likes_count || 0) + (favorited ? 1 : -1)
+      } : l));
       
       // Update selectedProduct if it's the one being favorited
       if (selectedProduct?.id === listingId) {
-        setSelectedProduct((prev: Listing | null) => prev ? { ...prev, isFavorited: favorited } : null);
+        setSelectedProduct((prev: Listing | null) => prev ? { 
+          ...prev, 
+          isFavorited: favorited,
+          likes_count: (prev.likes_count || 0) + (favorited ? 1 : -1)
+        } : null);
       }
+
+      // Clear cache to ensure fresh data on next fetch
+      listingsCache.clear();
     } catch (err) {
       console.error('Error toggling favorite:', err);
     }
@@ -309,9 +377,20 @@ export default function App() {
     };
   }, [user]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const handleLogoutSuccess = () => {
     setActiveTab('home');
+    setIsAdminView(false);
+  };
+
+  const confirmLogout = async () => {
+    await supabase.auth.signOut();
+    handleLogoutSuccess();
+    setIsLogoutModalOpen(false);
+    toast.success('Logged out successfully');
   };
 
   const handleStartChat = (conversationId: string) => {
@@ -321,10 +400,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans pb-20 lg:pb-0">
+    <div className={`min-h-screen bg-gray-50 font-sans ${activeTab === 'messages' ? 'pb-0' : 'pb-20'} lg:pb-0`}>
       <Toaster position="top-right" />
       {!isAdminView && !selectedProduct && (
-        <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+        <nav className="hidden lg:block sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
             {/* Logo */}
@@ -475,44 +554,54 @@ export default function App() {
       </nav>
     )}
       
-      <main className={`${activeTab === 'messages' ? 'max-w-full px-0' : (viewMode === 'grid' ? 'max-w-7xl px-4' : 'max-w-3xl px-4')} mx-auto pb-20 lg:pb-0 transition-all duration-500`}>
-        {isAdminView && userProfile?.role === 'admin' ? (
-          <AdminDashboard 
-            listings={listings} 
-            onBack={() => setIsAdminView(false)} 
-          />
-        ) : selectedProduct ? (
-          <ProductDetail 
-            product={selectedProduct} 
-            onBack={() => setSelectedProduct(null)} 
-            onViewProduct={(listing) => handleOpenListing(listing.id)}
-            onStartChat={handleStartChat}
-            onEdit={(listing) => {
-              setEditingListing(listing);
-              setIsPostAdOpen(true);
-            }}
-            onDelete={handleDeleteListing}
-          />
-        ) : activeTab === 'items' ? (
-          <MyListings 
-            onBack={() => setActiveTab('home')}
-            onViewProduct={(listing) => handleOpenListing(listing.id)}
-            onEditProfile={() => setActiveTab('profile')}
-          />
-        ) : activeTab === 'profile' ? (
-          <ProfileView 
-            onLogout={handleLogout} 
-            onBack={() => setActiveTab('home')}
-          />
-        ) : activeTab === 'messages' ? (
-          <ChatView 
-            initialConversationId={pendingConversationId} 
-            onConversationSelected={() => setPendingConversationId(null)}
-          />
-        ) : (
-          <>
-            {/* Sticky Search Bar */}
-            <div className="sticky top-16 z-40 bg-gray-50/95 backdrop-blur-md py-3 sm:py-4 -mx-4 px-4 mb-4 border-b border-gray-200/50">
+      <main className={`${activeTab === 'messages' ? 'max-w-full px-0' : (viewMode === 'grid' ? 'max-w-7xl px-4' : 'max-w-3xl px-4')} mx-auto transition-all duration-500`}>
+        <Suspense fallback={
+          <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+            <p className="text-gray-500 font-medium animate-pulse">Loading content...</p>
+          </div>
+        }>
+          {isAdminView && userProfile?.role === 'admin' ? (
+            <AdminDashboard 
+              listings={listings} 
+              onBack={() => setIsAdminView(false)} 
+            />
+          ) : selectedProduct ? (
+            <ProductDetail 
+              product={selectedProduct} 
+              onBack={() => setSelectedProduct(null)} 
+              onViewProduct={(listing) => handleOpenListing(listing.id)}
+              onStartChat={handleStartChat}
+              onEdit={(listing) => {
+                setEditingListing(listing);
+                setIsPostAdOpen(true);
+              }}
+              onDelete={handleDeleteListing}
+              onFavorite={handleToggleFavorite}
+            />
+          ) : activeTab === 'items' ? (
+            <MyListings 
+              user={user}
+              onBack={() => setActiveTab('home')}
+              onViewProduct={(listing) => handleOpenListing(listing.id)}
+              onEditProfile={() => setActiveTab('profile')}
+            />
+          ) : activeTab === 'profile' ? (
+            <ProfileView 
+              user={user}
+              onLogout={handleLogout} 
+              onLogoutSuccess={handleLogoutSuccess}
+              onBack={() => setActiveTab('home')}
+            />
+          ) : activeTab === 'messages' ? (
+            <ChatView 
+              initialConversationId={pendingConversationId} 
+              onConversationSelected={() => setPendingConversationId(null)}
+            />
+          ) : (
+            <>
+              {/* Sticky Search Bar */}
+            <div className="sticky top-0 lg:top-16 z-40 bg-gray-50/95 backdrop-blur-md py-3 sm:py-4 -mx-4 px-4 mb-4 border-b border-gray-200/50">
           <motion.form 
             onSubmit={handleSearch}
             initial={{ y: -10, opacity: 0 }}
@@ -538,8 +627,8 @@ export default function App() {
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={`p-1.5 sm:p-2 rounded-xl border transition-all flex items-center gap-1 sm:gap-2 ${isFilterOpen ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'}`}
             >
-              <Filter className="w-4 h-4 sm:w-5 h-5" />
-              <span className="text-xs sm:text-sm font-bold hidden xs:inline">Filters</span>
+              <Filter className="w-4 h-4" />
+              <span className="text-xs sm:text-sm font-bold">Filters</span>
             </button>
           </motion.form>
 
@@ -679,25 +768,55 @@ export default function App() {
 
         {/* Listings Section */}
         <section>
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Recent Listings</h2>
-              <p className="text-gray-500 text-sm font-medium">Showing {viewMode} view</p>
+          <div className="flex items-center justify-between gap-2 mb-6">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+              <div className="relative group min-w-[140px] sm:min-w-[180px]">
+                <select 
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full appearance-none bg-white border border-gray-100 rounded-xl sm:rounded-2xl pl-4 sm:pl-5 pr-8 sm:pr-10 py-2 sm:py-3.5 text-[11px] sm:text-sm font-black text-gray-900 shadow-sm hover:border-emerald-500 transition-all cursor-pointer outline-none focus:ring-4 focus:ring-emerald-500/10"
+                >
+                  <option value="created_at">Recent</option>
+                  <option value="price">Price</option>
+                  <option value="likes_count">Most Liked</option>
+                </select>
+                <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-emerald-500 transition-colors">
+                  <ArrowUpDown className="w-3 h-3 sm:w-4 h-4" />
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className={`p-2 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all shadow-sm flex items-center justify-center group ${
+                  sortOrder === 'desc' 
+                    ? 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50' 
+                    : 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-emerald-100/50'
+                }`}
+                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                <ArrowUpDown className={`w-4 h-4 sm:w-5 h-5 transition-transform duration-500 ease-out ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+              </button>
             </div>
             
-            <div className="flex items-center bg-white p-1 rounded-xl border border-gray-100 shadow-sm">
-              <button 
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'text-gray-400 hover:bg-gray-50'}`}
-              >
-                <List className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'text-gray-400 hover:bg-gray-50'}`}
-              >
-                <LayoutGrid className="w-5 h-5" />
-              </button>
+            <div className="flex items-center gap-2 sm:gap-6 shrink-0">
+              <div className="hidden sm:block h-8 w-px bg-gray-100" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] hidden sm:block">Display</p>
+                <div className="flex items-center bg-gray-50/50 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-inner">
+                  <button 
+                    onClick={() => setViewMode('list')}
+                    className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-300 ${viewMode === 'list' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <List className="w-4 h-4 sm:w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-300 ${viewMode === 'grid' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <LayoutGrid className="w-4 h-4 sm:w-5 h-5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -722,6 +841,7 @@ export default function App() {
                   categoryIcon={listing.category_data?.icon || listing.categoryIcon}
                   isPromoted={listing.isPromoted}
                   isFavorited={listing.isFavorited}
+                  likesCount={listing.likes_count}
                   viewMode={viewMode} 
                   onClick={() => handleOpenListing(listing.id)}
                   onFavorite={() => handleToggleFavorite(listing.id)}
@@ -729,6 +849,28 @@ export default function App() {
               ))
             )}
           </div>
+          
+          {hasMore && (
+            <div className="flex justify-center mt-12 mb-8">
+              <button
+                onClick={() => fetchListings(true)}
+                disabled={isFetchingMore}
+                className="group relative px-8 py-4 bg-white border-2 border-emerald-500 text-emerald-600 rounded-2xl font-black text-lg hover:bg-emerald-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 shadow-xl shadow-emerald-500/10 active:scale-95"
+              >
+                {isFetchingMore ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span>FETCHING...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>LOAD MORE ITEMS</span>
+                    <PlusCircle className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Why Omni Section */}
@@ -763,11 +905,12 @@ export default function App() {
         </section>
           </>
         )}
+        </Suspense>
       </main>
 
       {!isAdminView && !selectedProduct && (
         <>
-          <footer className="bg-gray-900 text-white py-16">
+          <footer className="hidden lg:block bg-gray-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-4 gap-12">
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-6">
@@ -881,6 +1024,17 @@ export default function App() {
         title="Delete Listing"
         message="Are you sure you want to delete this listing? This action cannot be undone."
         confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
+
+      <ConfirmationModal 
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={confirmLogout}
+        title="Log Out"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Log Out"
         cancelText="Cancel"
         type="danger"
       />

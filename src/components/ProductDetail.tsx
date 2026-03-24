@@ -16,10 +16,15 @@ import {
   Edit3,
   Trash2,
   Star,
-  Send
+  Send,
+  X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Listing, api, Review } from '../services/api';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { Listing, api, Review, UserProfile } from '../services/api';
 import { supabase } from '../lib/supabase';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
 import { LazyImage } from './LazyImage';
@@ -33,9 +38,10 @@ interface ProductDetailProps {
   onStartChat?: (conversationId: string) => void;
   onEdit?: (listing: Listing) => void;
   onDelete?: (listingId: string | number) => void;
+  onFavorite?: (listingId: string | number) => void;
 }
 
-export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onEdit, onDelete }: ProductDetailProps) => {
+export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onEdit, onDelete, onFavorite }: ProductDetailProps) => {
   const [activeImage, setActiveImage] = useState(product.image);
   const [relatedItems, setRelatedItems] = useState<Listing[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
@@ -45,11 +51,23 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
   
   // Review state
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [sellerProfile, setSellerProfile] = useState<UserProfile | null>(null);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 100);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -122,6 +140,24 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     };
 
     fetchReviews();
+
+    const fetchSellerProfile = async () => {
+      if (!product.seller_id) return;
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', product.seller_id)
+          .single();
+        
+        if (error) throw error;
+        setSellerProfile(data);
+      } catch (error) {
+        console.error('Error fetching seller profile:', error);
+      }
+    };
+
+    fetchSellerProfile();
 
     // Reset active image when product changes
     setActiveImage(product.image);
@@ -242,170 +278,238 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
 
   return (
     <motion.div 
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="min-h-screen bg-white"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="min-h-screen bg-gray-50 pb-24 lg:pb-0"
     >
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-4 flex items-center justify-between">
+      {/* Mobile Header - Floating/Sticky */}
+      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 py-3 flex items-center justify-between ${
+        isScrolled ? 'bg-white shadow-sm' : 'bg-transparent'
+      }`}>
         <button 
           onClick={onBack}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className={`p-2 rounded-full transition-all ${
+            isScrolled ? 'bg-gray-100 text-gray-900' : 'bg-black/20 backdrop-blur-md text-white'
+          }`}
         >
-          <ArrowLeft className="w-6 h-6 text-gray-900" />
+          <ArrowLeft className="w-6 h-6" />
         </button>
         <div className="flex gap-2">
           <button 
             onClick={() => setIsShareModalOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className={`p-2 rounded-full transition-all ${
+              isScrolled ? 'bg-gray-100 text-gray-600' : 'bg-black/20 backdrop-blur-md text-white'
+            }`}
           >
-            <Share2 className="w-5 h-5 text-gray-600" />
+            <Share2 className="w-5 h-5" />
           </button>
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <Heart className="w-5 h-5 text-gray-600" />
+          <button 
+            onClick={() => onFavorite?.(product.id)}
+            className={`p-2 rounded-full transition-all flex items-center gap-1.5 ${
+              isScrolled 
+                ? (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600 hover:text-red-500') 
+                : (product.isFavorited ? 'bg-red-500 text-white' : 'bg-black/20 backdrop-blur-md text-white hover:text-red-500')
+            }`}
+          >
+            <Heart className={`w-5 h-5 ${product.isFavorited ? 'fill-current' : ''}`} />
+            {product.likes_count !== undefined && product.likes_count > 0 && (
+              <span className="text-xs font-black">{product.likes_count}</span>
+            )}
           </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto lg:px-4 lg:py-6 grid lg:grid-cols-3 gap-8">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
-          <div className="space-y-4">
-            {/* Main Image Container - Mobile: Scroll, Desktop: Single with Thumbnails */}
-            <div className="relative group">
-              <div className="aspect-[4/3] rounded-3xl overflow-hidden bg-gray-100 border border-gray-100 sm:block hidden">
-                <LazyImage 
-                  src={getOptimizedImageUrl(activeImage, { width: 1200, height: 900 })} 
-                  alt={product.title}
-                  className="w-full h-full object-cover transition-all duration-500"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-
-              {/* Mobile Swipeable Gallery */}
-              <div 
-                className="sm:hidden flex overflow-x-auto snap-x snap-mandatory no-scrollbar aspect-[4/3] rounded-3xl bg-gray-100 border border-gray-100"
-                onScroll={(e) => {
-                  const scrollLeft = e.currentTarget.scrollLeft;
-                  const width = e.currentTarget.offsetWidth;
-                  const index = Math.round(scrollLeft / width);
-                  if (allImages[index] && allImages[index] !== activeImage) {
-                    setActiveImage(allImages[index]);
-                  }
-                }}
-              >
-                {allImages.map((img: string, idx: number) => (
-                  <div key={idx} className="w-full h-full flex-shrink-0 snap-center">
-                    <LazyImage 
-                      src={getOptimizedImageUrl(img, { width: 800, height: 600 })} 
-                      alt={`${product.title} - ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Image Indicators (Dots) for Mobile */}
-              {allImages.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:hidden">
-                  {allImages.map((_: any, idx: number) => (
-                    <div 
-                      key={idx}
-                      className={`w-1.5 h-1.5 rounded-full transition-all ${
-                        activeImage === allImages[idx] ? 'bg-emerald-500 w-4' : 'bg-white/60'
-                      }`}
-                    />
-                  ))}
+          <div className="relative lg:rounded-3xl overflow-hidden bg-gray-200">
+            {/* Desktop Main Image */}
+            <div 
+              className="aspect-[4/3] hidden lg:block cursor-zoom-in group"
+              onClick={() => setIsZoomOpen(true)}
+            >
+              <LazyImage 
+                src={getOptimizedImageUrl(activeImage, { width: 1200, height: 900 })} 
+                alt={product.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <div className="bg-white/20 backdrop-blur-md p-3 rounded-full text-white">
+                  <ZoomIn className="w-6 h-6" />
                 </div>
-              )}
+              </div>
             </div>
-            
-            {/* Thumbnails - Hidden on very small screens, shown on desktop */}
+
+            {/* Mobile Swipeable Gallery - Full Width */}
+            <div 
+              className="lg:hidden flex overflow-x-auto snap-x snap-mandatory no-scrollbar aspect-[4/3]"
+              onScroll={(e) => {
+                const scrollLeft = e.currentTarget.scrollLeft;
+                const width = e.currentTarget.offsetWidth;
+                const index = Math.round(scrollLeft / width);
+                if (allImages[index] && allImages[index] !== activeImage) {
+                  setActiveImage(allImages[index]);
+                }
+              }}
+            >
+              {allImages.map((img: string, idx: number) => (
+                <div 
+                  key={idx} 
+                  className="w-full h-full flex-shrink-0 snap-center cursor-zoom-in"
+                  onClick={() => setIsZoomOpen(true)}
+                >
+                  <LazyImage 
+                    src={getOptimizedImageUrl(img, { width: 800, height: 600 })} 
+                    alt={`${product.title} - ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Image Indicators (Dots) */}
             {allImages.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar sm:flex hidden">
-                {allImages.map((img: string, idx: number) => (
-                  <button
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {allImages.map((_: any, idx: number) => (
+                  <div 
                     key={idx}
-                    onClick={() => setActiveImage(img)}
-                    className={`relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all ${
-                      activeImage === img ? 'border-emerald-500 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      activeImage === allImages[idx] ? 'bg-emerald-500 w-6' : 'bg-white/60 w-1.5'
                     }`}
-                  >
-                    <LazyImage 
-                      src={getOptimizedImageUrl(img, { width: 100, height: 100 })} 
-                      alt={`Thumbnail ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </button>
+                  />
                 ))}
               </div>
             )}
-          </div>
 
-          {/* Product Info */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              {product.isPromoted && (
-                <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider">
-                  Promoted
-                </span>
-              )}
-              {(product.category_data || product.category) && (
-                <span className="bg-emerald-100 text-emerald-600 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider flex items-center gap-1">
-                  <span>{product.category_data?.icon || product.categoryIcon}</span>
-                  <span>
-                    {product.category_data?.parent 
-                      ? `${product.category_data.parent.name} > ${product.category_data.name}` 
-                      : (product.category_data?.name || product.category)}
-                  </span>
-                </span>
-              )}
-              <span className="text-gray-400 text-sm font-medium flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                {product.postedAt || '2 hours ago'}
-              </span>
+            {/* Image Count Badge */}
+            <div className="absolute bottom-6 right-6 bg-black/40 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full">
+              {allImages.indexOf(activeImage) + 1} / {allImages.length}
             </div>
-            
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight leading-tight">
-              {product.title}
-            </h1>
-            
-            <div className="flex items-center justify-between">
-              <div className="text-4xl font-black text-emerald-600">
+          </div>
+          
+          {/* Desktop Thumbnails */}
+          {allImages.length > 1 && (
+            <div className="hidden lg:flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+              {allImages.map((img: string, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImage(img)}
+                  className={`relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all ${
+                    activeImage === img ? 'border-emerald-500 scale-105 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <LazyImage 
+                    src={getOptimizedImageUrl(img, { width: 100, height: 100 })} 
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Product Info Card */}
+          <div className="bg-white lg:rounded-3xl p-6 lg:shadow-sm space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {product.isPromoted && (
+                    <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider">
+                      Promoted
+                    </span>
+                  )}
+                  <span className="bg-emerald-50 text-emerald-600 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider flex items-center gap-1">
+                    <span>{product.category_data?.icon || product.categoryIcon}</span>
+                    <span>{product.category_data?.name || product.category}</span>
+                  </span>
+                </div>
+                <span className="text-gray-400 text-xs font-medium flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {product.postedAt || 'Recently'}
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-tight">
+                  {product.title}
+                </h1>
+                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
+                  <MapPin className="w-4 h-4 text-emerald-500" />
+                  {product.location}
+                </div>
+              </div>
+
+              <div className="text-4xl font-black text-emerald-600 pt-2">
                 Br{product.price.toLocaleString()}
               </div>
-              <div className="flex items-center gap-1 text-gray-500 font-medium">
-                <MapPin className="w-4 h-4" />
-                {product.location}
-              </div>
+            </div>
+
+            <div className="h-[1px] bg-gray-100" />
+
+            {/* Description */}
+            <div className="space-y-3">
+              <h2 className="text-lg font-bold text-gray-900">Description</h2>
+              <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+                {product.description || "No description provided."}
+              </p>
             </div>
           </div>
 
-          <div className="h-[1px] bg-gray-100" />
-
-          {/* Description */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">Description</h2>
-            <p className="text-gray-600 leading-relaxed text-lg">
-              {product.description || "This is a high-quality item in excellent condition. Perfect for anyone looking for reliability and style. Please contact me for more details or to arrange a viewing."}
-            </p>
+          {/* Seller Info - Mobile (Integrated into main flow) */}
+          <div className="lg:hidden bg-white p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 overflow-hidden">
+                  {sellerProfile?.avatar_url ? (
+                    <img src={sellerProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-7 h-7" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">{sellerProfile?.full_name || product.sellerName || 'Verified Seller'}</h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          className={`w-3 h-3 ${star <= Math.round(averageRating) ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}`} 
+                        />
+                      ))}
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-500">({reviews.length})</span>
+                  </div>
+                </div>
+              </div>
+              <button className="text-emerald-600 font-bold text-sm px-4 py-2 bg-emerald-50 rounded-xl">
+                View Profile
+              </button>
+            </div>
           </div>
 
           {/* Safety Tips */}
-          <div className="bg-blue-50 rounded-3xl p-6 space-y-4 border border-blue-100">
-            <div className="flex items-center gap-3 text-blue-600">
+          <div className="mx-4 lg:mx-0 bg-amber-50 rounded-3xl p-6 space-y-4 border border-amber-100">
+            <div className="flex items-center gap-3 text-amber-700">
               <ShieldCheck className="w-6 h-6" />
               <h3 className="font-bold text-lg">Safety Tips</h3>
             </div>
-            <ul className="space-y-2 text-blue-800/70 text-sm font-medium">
-              <li>• Meet the seller in a public place</li>
-              <li>• Check the item before you buy</li>
-              <li>• Pay only after collecting the item</li>
-            </ul>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { icon: "🤝", text: "Meet in public" },
+                { icon: "🔍", text: "Check item first" },
+                { icon: "💵", text: "Pay after check" }
+              ].map((tip, i) => (
+                <div key={i} className="flex items-center gap-3 bg-white/50 p-3 rounded-2xl">
+                  <span className="text-xl">{tip.icon}</span>
+                  <span className="text-sm font-bold text-amber-900/70">{tip.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Reviews Section */}
@@ -565,16 +669,20 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
+        {/* Sidebar - Desktop Only */}
+        <div className="hidden lg:block space-y-6">
           {/* Seller Info */}
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-6">
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm space-y-6 sticky top-24">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
-                <User className="w-8 h-8" />
+              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 overflow-hidden">
+                {sellerProfile?.avatar_url ? (
+                  <img src={sellerProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-8 h-8" />
+                )}
               </div>
               <div>
-                <h3 className="font-bold text-lg text-gray-900">{product.sellerName || 'Verified Seller'}</h3>
+                <h3 className="font-bold text-lg text-gray-900">{sellerProfile?.full_name || product.sellerName || 'Verified Seller'}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex items-center gap-0.5">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -621,21 +729,73 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                     <MessageCircle className="w-5 h-5" />
                     Start Chat
                   </button>
+                  <button 
+                    onClick={() => onFavorite?.(product.id)}
+                    className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${
+                      product.isFavorited 
+                        ? 'bg-red-50 text-red-500 border-2 border-red-500' 
+                        : 'bg-white border-2 border-gray-200 text-gray-500 hover:border-red-500 hover:text-red-500'
+                    }`}
+                  >
+                    <Heart className={`w-5 h-5 ${product.isFavorited ? 'fill-current' : ''}`} />
+                    {product.isFavorited ? 'Favorited' : 'Add to Favorites'}
+                    {product.likes_count !== undefined && product.likes_count > 0 && (
+                      <span className="ml-1 px-2 py-0.5 bg-gray-100 rounded-full text-xs">
+                        {product.likes_count}
+                      </span>
+                    )}
+                  </button>
                 </>
               )}
             </div>
+            
+            <button 
+              onClick={() => setIsReporting(true)}
+              className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-red-500 transition-colors font-medium py-2"
+            >
+              <Flag className="w-4 h-4" />
+              Report this ad
+            </button>
           </div>
-
-          {/* Report Ad */}
-          <button 
-            onClick={() => setIsReporting(true)}
-            className="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-red-500 transition-colors font-medium py-2"
-          >
-            <Flag className="w-4 h-4" />
-            Report this ad
-          </button>
         </div>
       </div>
+
+      {/* Mobile Sticky Bottom Actions */}
+      {!isOwner && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+          <button className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+            <Phone className="w-5 h-5" />
+            Call
+          </button>
+          <button 
+            onClick={handleStartChat}
+            className="flex-1 bg-white border-2 border-emerald-500 text-emerald-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2"
+          >
+            <MessageCircle className="w-5 h-5" />
+            Chat
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Owner Actions */}
+      {isOwner && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+          <button 
+            onClick={() => onEdit?.(product)}
+            className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2"
+          >
+            <Edit3 className="w-5 h-5" />
+            Edit
+          </button>
+          <button 
+            onClick={() => onDelete?.(product?.id || '')}
+            className="flex-1 bg-red-50 text-red-500 border-2 border-red-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2"
+          >
+            <Trash2 className="w-5 h-5" />
+            Delete
+          </button>
+        </div>
+      )}
 
       {/* Report Modal */}
       {isReporting && (
@@ -761,6 +921,72 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           </div>
         )}
       </div>
+
+      {/* Image Zoom Modal */}
+      <AnimatePresence>
+        {isZoomOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center"
+          >
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/50 to-transparent">
+              <span className="text-white font-medium">
+                {allImages.indexOf(activeImage) + 1} / {allImages.length}
+              </span>
+              <button 
+                onClick={() => setIsZoomOpen(false)}
+                className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="w-full h-full flex items-center justify-center">
+              <TransformWrapper
+                initialScale={1}
+                minScale={0.5}
+                maxScale={8}
+                centerOnInit
+              >
+                {({ zoomIn, zoomOut, resetTransform }) => (
+                  <>
+                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-3 z-10">
+                      <button 
+                        onClick={() => zoomIn()}
+                        className="p-3 bg-white/10 backdrop-blur-md rounded-2xl text-white hover:bg-white/20 transition-all"
+                      >
+                        <ZoomIn className="w-6 h-6" />
+                      </button>
+                      <button 
+                        onClick={() => zoomOut()}
+                        className="p-3 bg-white/10 backdrop-blur-md rounded-2xl text-white hover:bg-white/20 transition-all"
+                      >
+                        <ZoomOut className="w-6 h-6" />
+                      </button>
+                      <button 
+                        onClick={() => resetTransform()}
+                        className="p-3 bg-white/10 backdrop-blur-md rounded-2xl text-white hover:bg-white/20 transition-all"
+                      >
+                        <RotateCcw className="w-6 h-6" />
+                      </button>
+                    </div>
+                    <TransformComponent wrapperClass="!w-full !h-full" contentClass="!w-full !h-full flex items-center justify-center">
+                      <img
+                        src={activeImage}
+                        alt="Zoomed product"
+                        className="max-w-full max-h-full object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </TransformComponent>
+                  </>
+                )}
+              </TransformWrapper>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Share Modal */}
       <ShareModal

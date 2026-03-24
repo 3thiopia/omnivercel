@@ -202,13 +202,16 @@ export const api = {
       min_price?: number;
       max_price?: number;
       location?: string;
+      page?: number;
+      limit?: number;
     }, _token?: string): Promise<Listing[]> => {
       let query = supabase
         .from('listings')
         .select(`
           *,
           category_data:categories(name, icon),
-          profiles(full_name)
+          profiles(full_name),
+          favorites(count)
         `);
 
       // 1. Status Filter
@@ -247,10 +250,17 @@ export const api = {
       if (params?.location) query = query.ilike('location', `%${params.location}%`);
       
       // 5. Sorting
-      if (params?.sort) {
+      if (params?.sort && params.sort !== 'likes_count') {
         query = query.order(params.sort, { ascending: params.order === 'asc' });
-      } else {
+      } else if (!params?.sort) {
         query = query.order('created_at', { ascending: false });
+      }
+
+      // 6. Pagination
+      if (params?.page && params?.limit) {
+        const from = (params.page - 1) * params.limit;
+        const to = from + params.limit - 1;
+        query = query.range(from, to);
       }
 
       const { data, error } = await query;
@@ -263,8 +273,21 @@ export const api = {
         category: item.category_data?.name,
         categoryIcon: item.category_data?.icon,
         postedAt: item.created_at,
-        isPromoted: item.is_promoted
+        isPromoted: item.is_promoted,
+        likes_count: item.favorites?.[0]?.count || 0
       }));
+
+      // 6. Memory Sort for likes_count (since Supabase can't easily sort by related count)
+      if (params?.sort === 'likes_count') {
+        mappedData.sort((a, b) => {
+          const order = params.order === 'asc' ? 1 : -1;
+          // Sort by likes_count, then by created_at as a tie-breaker
+          if (a.likes_count !== b.likes_count) {
+            return (a.likes_count - b.likes_count) * order;
+          }
+          return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * order;
+        });
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
