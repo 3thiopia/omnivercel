@@ -483,58 +483,38 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex relative pb-20 lg:pb-0">
+    <div className="min-h-screen bg-[#F8F9FA] flex relative pb-24 lg:pb-0">
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-between z-50 lg:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        <button 
-          onClick={() => setActiveTab('overview')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'overview' ? 'text-gray-900' : 'text-gray-400'}`}
-        >
-          <LayoutDashboard className={`w-6 h-6 ${activeTab === 'overview' ? 'fill-gray-900/10' : ''}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Overview</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('listings')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'listings' ? 'text-gray-900' : 'text-gray-400'}`}
-        >
-          <Package className={`w-6 h-6 ${activeTab === 'listings' ? 'fill-gray-900/10' : ''}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Listings</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('users')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'users' ? 'text-gray-900' : 'text-gray-400'}`}
-        >
-          <Users className={`w-6 h-6 ${activeTab === 'users' ? 'fill-gray-900/10' : ''}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Users</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('categories')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'categories' ? 'text-gray-900' : 'text-gray-400'}`}
-        >
-          <FolderTree className={`w-6 h-6 ${activeTab === 'categories' ? 'fill-gray-900/10' : ''}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Cats</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('reports')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'reports' ? 'text-gray-900' : 'text-gray-400'}`}
-        >
-          <Flag className={`w-6 h-6 ${activeTab === 'reports' ? 'fill-gray-900/10' : ''}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Reports</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('ads')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'ads' ? 'text-gray-900' : 'text-gray-400'}`}
-        >
-          <BarChart3 className={`w-6 h-6 ${activeTab === 'ads' ? 'fill-gray-900/10' : ''}`} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Ads</span>
-        </button>
-        <button 
-          onClick={onBack}
-          className="flex flex-col items-center gap-1 text-red-500"
-        >
-          <ArrowLeft className="w-6 h-6" />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Exit</span>
-        </button>
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-2 py-2 z-50 lg:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+        <div className="flex items-center justify-around">
+          {[
+            { id: 'overview', icon: LayoutDashboard, label: 'Home' },
+            { id: 'listings', icon: Package, label: 'Ads' },
+            { id: 'users', icon: Users, label: 'Users' },
+            { id: 'reports', icon: Flag, label: 'Alerts' },
+            { id: 'ads', icon: BarChart3, label: 'Promote' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as any)}
+              className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all min-w-[64px] ${
+                activeTab === item.id 
+                  ? 'text-emerald-600 bg-emerald-50' 
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'scale-110' : ''} transition-transform`} />
+              <span className="text-[9px] font-black uppercase tracking-tighter">{item.label}</span>
+            </button>
+          ))}
+          <button 
+            onClick={onBack}
+            className="flex flex-col items-center gap-1 p-2 text-red-500 min-w-[64px]"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-[9px] font-black uppercase tracking-tighter">Exit</span>
+          </button>
+        </div>
       </nav>
 
       {/* Mobile Sidebar Overlay (Keeping for Settings/System if needed, or can remove) */}
@@ -568,9 +548,18 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
       {/* Main Content */}
       <main className="flex-1 min-w-0 overflow-y-auto">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="hidden md:flex items-center bg-gray-100 rounded-xl px-4 py-2 w-full max-w-md gap-3">
+        <header className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 lg:px-8 py-4 flex items-center justify-between sticky top-0 z-40">
+          <div className="flex items-center gap-3 flex-1">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <Menu className="w-6 h-6 text-gray-600" />
+            </button>
+            <h1 className="text-xl lg:text-2xl font-black text-gray-900 uppercase tracking-tight">
+              {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            </h1>
+            <div className="hidden md:flex items-center bg-gray-100 rounded-xl px-4 py-2 w-full max-w-md gap-3 ml-4">
               <Search className="w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
@@ -581,13 +570,16 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
           </div>
           
           <div className="flex items-center gap-2 lg:gap-4">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Live</span>
+            </div>
             <div className="h-8 w-[1px] bg-gray-200 mx-1 lg:mx-2"></div>
             <div className="flex items-center gap-2 lg:gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-gray-900">Admin User</p>
-                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Super Admin</p>
+                <p className="text-sm font-bold text-gray-900">Admin</p>
               </div>
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-emerald-500 rounded-lg lg:rounded-xl flex items-center justify-center text-white font-bold text-sm lg:text-base">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gray-900 rounded-lg lg:rounded-xl flex items-center justify-center text-white font-bold text-sm lg:text-base">
                 AU
               </div>
             </div>
@@ -1384,19 +1376,136 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                     )}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto scrollbar-hide">
-                    <table className="w-full text-left min-w-[900px]">
-                      <thead className="bg-gray-50/50 border-b border-gray-100">
-                        <tr>
-                          <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Listing Info</th>
-                          <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reporter</th>
-                          <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Violation</th>
-                          <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Timeline</th>
-                          <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                          <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Management</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
+                  <>
+                    {/* Mobile Report Cards */}
+                    <div className="lg:hidden divide-y divide-gray-50">
+                      {reports
+                        .filter(report => {
+                          const status = report.status?.toLowerCase() || 'pending';
+                          return reportView === 'active' ? status === 'pending' : status !== 'pending';
+                        })
+                        .filter(report => {
+                          if (!reportSearchQuery) return true;
+                          const query = reportSearchQuery.toLowerCase();
+                          return (
+                            report.listing?.title?.toLowerCase().includes(query) ||
+                            report.reporter?.full_name?.toLowerCase().includes(query) ||
+                            report.reporter?.email?.toLowerCase().includes(query) ||
+                            report.reason?.toLowerCase().includes(query) ||
+                            report.listing_id?.toString().includes(query)
+                          );
+                        })
+                        .map((report) => (
+                          <div 
+                            key={report.id} 
+                            onClick={() => setSelectedReport(report)}
+                            className="p-4 space-y-4 active:bg-gray-50 transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative flex-shrink-0">
+                                  <img 
+                                    src={report.listing?.thumbnail_url || 'https://picsum.photos/seed/placeholder/100/100'} 
+                                    alt="" 
+                                    className="w-12 h-12 rounded-xl object-cover shadow-sm" 
+                                  />
+                                  {report.listing?.status === 'hidden' && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center">
+                                      <XCircle className="w-2 h-2 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-black text-gray-900 truncate">
+                                    {report.listing?.title || 'Unknown Listing'}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[9px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded">#{report.listing_id}</span>
+                                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                                      report.status === 'pending' ? 'bg-orange-50 text-orange-600' :
+                                      report.status === 'resolved' ? 'bg-emerald-50 text-emerald-600' :
+                                      'bg-gray-100 text-gray-500'
+                                    }`}>
+                                      {report.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-[10px] font-black text-red-600 uppercase tracking-tight">{report.reason}</p>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                                  {new Date(report.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {report.details && (
+                              <p className="text-[11px] text-gray-500 line-clamp-2 bg-gray-50 p-2 rounded-lg italic">
+                                "{report.details}"
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-500">
+                                  {report.reporter?.full_name?.charAt(0) || 'A'}
+                                </div>
+                                <p className="text-[10px] text-gray-400 font-medium truncate max-w-[100px]">
+                                  {report.reporter?.full_name || 'Anonymous'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {report.status === 'pending' && (
+                                  <>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportAction(report, 'resolve');
+                                      }}
+                                      className="p-2 text-emerald-500 bg-emerald-50 rounded-xl"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportAction(report, 'dismiss');
+                                      }}
+                                      className="p-2 text-gray-400 bg-gray-50 rounded-xl"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReportAction(report, 'delete');
+                                  }}
+                                  className="p-2 text-red-500 bg-red-50 rounded-xl"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden lg:block overflow-x-auto scrollbar-hide">
+                      <table className="w-full text-left min-w-[900px]">
+                        <thead className="bg-gray-50/50 border-b border-gray-100">
+                          <tr>
+                            <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Listing Info</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reporter</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Violation</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Timeline</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Management</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
                         {reports
                           .filter(report => {
                             const status = report.status?.toLowerCase() || 'pending';
@@ -1589,6 +1698,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                       </tbody>
                     </table>
                   </div>
+                </>
                 )}
               </div>
             </motion.div>
@@ -1623,83 +1733,146 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                     <h3 className="text-lg font-bold text-gray-900">No users found</h3>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto scrollbar-hide">
-                    <table className="w-full text-left min-w-[800px]">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">User</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Joined</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {users.map((user) => (
-                          <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                                  {user.avatar_url ? (
-                                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Users className="w-5 h-5 text-gray-400" />
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{user.full_name}</p>
-                                  <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{user.email}</p>
-                                </div>
+                  <>
+                    {/* Mobile User Cards */}
+                    <div className="lg:hidden divide-y divide-gray-50">
+                      {users.map((user) => (
+                        <div key={user.id} className="p-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                {user.avatar_url ? (
+                                  <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Users className="w-6 h-6 text-gray-400" />
+                                )}
                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-gray-900 truncate">{user.full_name}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
                                 user.role === 'admin' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'
                               }`}>
                                 {user.role}
                               </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
                                 user.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
                               }`}>
                                 {user.status || 'active'}
                               </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="text-xs text-gray-500 font-medium">
-                                {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
-                              </p>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center justify-end gap-2">
-                                {user.status === 'suspended' || user.status === 'banned' ? (
-                                  <button 
-                                    onClick={() => handleUpdateUserStatus(user.id, 'active')}
-                                    className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                                    title="Unblock User"
-                                  >
-                                    <CheckCircle2 className="w-5 h-5" />
-                                  </button>
-                                ) : (
-                                  <button 
-                                    onClick={() => handleBanUser(user.id)}
-                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    title="Block User"
-                                  >
-                                    <UserX className="w-5 h-5" />
-                                  </button>
-                                )}
-                                <button className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all">
-                                  <MoreVertical className="w-5 h-5" />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                              Joined {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              {user.status === 'suspended' || user.status === 'banned' ? (
+                                <button 
+                                  onClick={() => handleUpdateUserStatus(user.id, 'active')}
+                                  className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase transition-all"
+                                >
+                                  Unblock
                                 </button>
-                              </div>
-                            </td>
+                              ) : (
+                                <button 
+                                  onClick={() => handleBanUser(user.id)}
+                                  className="px-3 py-1.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase transition-all"
+                                >
+                                  Block
+                                </button>
+                              )}
+                              <button className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition-all">
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden lg:block overflow-x-auto scrollbar-hide">
+                      <table className="w-full text-left min-w-[800px]">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">User</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Joined</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {users.map((user) => (
+                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                                    {user.avatar_url ? (
+                                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Users className="w-5 h-5 text-gray-400" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{user.full_name}</p>
+                                    <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{user.email}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                                  user.role === 'admin' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'
+                                }`}>
+                                  {user.role}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
+                                  user.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                                }`}>
+                                  {user.status || 'active'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <p className="text-xs text-gray-500 font-medium">
+                                  {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                                </p>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-end gap-2">
+                                  {user.status === 'suspended' || user.status === 'banned' ? (
+                                    <button 
+                                      onClick={() => handleUpdateUserStatus(user.id, 'active')}
+                                      className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                                      title="Unblock User"
+                                    >
+                                      <CheckCircle2 className="w-5 h-5" />
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={() => handleBanUser(user.id)}
+                                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                      title="Block User"
+                                    >
+                                      <UserX className="w-5 h-5" />
+                                    </button>
+                                  )}
+                                  <button className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all">
+                                    <MoreVertical className="w-5 h-5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             </motion.div>
@@ -1769,39 +1942,66 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                 <div className="p-6 border-b border-gray-100">
                   <h3 className="text-lg font-bold text-gray-900">Promote New Listing</h3>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50/50">
-                      <tr>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Listing</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Seller</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Price</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {localListings.filter(l => !l.is_ad && l.status === 'active').slice(0, 10).map(listing => (
-                        <tr key={listing.id} className="hover:bg-gray-50/50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <img src={listing.image} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
-                              <p className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{listing.title}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-600">{listing.sellerName || 'Verified Seller'}</td>
-                          <td className="px-6 py-4 text-sm font-black text-gray-900">Br {listing.price.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-right">
-                            <button 
-                              onClick={() => setAdModal({ isOpen: true, listing, row: 1, col: 1 })}
-                              className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black uppercase hover:bg-emerald-500 hover:text-white transition-all"
-                            >
-                              Promote
-                            </button>
-                          </td>
+                <div className="bg-white">
+                  {/* Mobile Listing Cards for Ads */}
+                  <div className="lg:hidden divide-y divide-gray-50">
+                    {localListings.filter(l => !l.is_ad && l.status === 'active').slice(0, 10).map(listing => (
+                      <div key={listing.id} className="p-4 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <img src={listing.image} alt="" className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-gray-900 truncate">{listing.title}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{listing.sellerName || 'Verified Seller'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                          <p className="text-sm font-black text-emerald-600">Br {listing.price.toLocaleString()}</p>
+                          <button 
+                            onClick={() => setAdModal({ isOpen: true, listing, row: 1, col: 1 })}
+                            className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all"
+                          >
+                            Promote
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-50/50">
+                        <tr>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Listing</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Seller</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Price</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {localListings.filter(l => !l.is_ad && l.status === 'active').slice(0, 10).map(listing => (
+                          <tr key={listing.id} className="hover:bg-gray-50/50 transition-colors group">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <img src={listing.image} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
+                                <p className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{listing.title}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-600">{listing.sellerName || 'Verified Seller'}</td>
+                            <td className="px-6 py-4 text-sm font-black text-gray-900">Br {listing.price.toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right">
+                              <button 
+                                onClick={() => setAdModal({ isOpen: true, listing, row: 1, col: 1 })}
+                                className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black uppercase hover:bg-emerald-500 hover:text-white transition-all"
+                              >
+                                Promote
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </motion.div>

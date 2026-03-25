@@ -335,12 +335,16 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     >
       {/* Header - Floating/Sticky */}
       <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between ${
-        isScrolled ? 'bg-white shadow-sm py-3' : 'bg-transparent pt-8 pb-3'
+        isScrolled 
+          ? 'bg-white shadow-sm py-3' 
+          : 'bg-white lg:bg-transparent pt-3 lg:pt-8 pb-3'
       }`}>
         <button 
           onClick={onBack}
           className={`p-2 rounded-full transition-all ${
-            isScrolled ? 'bg-gray-100 text-gray-900' : 'bg-black/20 backdrop-blur-md text-white'
+            isScrolled 
+              ? 'bg-gray-100 text-gray-900' 
+              : 'bg-gray-100 text-gray-900 lg:bg-black/20 lg:backdrop-blur-md lg:text-white'
           }`}
         >
           <ArrowLeft className="w-6 h-6" />
@@ -349,7 +353,9 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           <button 
             onClick={() => setIsShareModalOpen(true)}
             className={`p-2 rounded-full transition-all ${
-              isScrolled ? 'bg-gray-100 text-gray-600' : 'bg-black/20 backdrop-blur-md text-white'
+              isScrolled 
+                ? 'bg-gray-100 text-gray-600' 
+                : 'bg-gray-100 text-gray-600 lg:bg-black/20 lg:backdrop-blur-md lg:text-white'
             }`}
           >
             <Share2 className="w-5 h-5" />
@@ -359,7 +365,9 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             className={`p-2 rounded-full transition-all flex items-center gap-1.5 ${
               isScrolled 
                 ? (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600 hover:text-red-500') 
-                : (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-black/20 backdrop-blur-md text-white hover:text-red-500')
+                : (product.isFavorited 
+                    ? 'bg-red-50 text-red-500' 
+                    : 'bg-gray-100 text-gray-600 lg:bg-black/20 lg:backdrop-blur-md lg:text-white hover:text-red-500')
             }`}
           >
             <Heart className={`w-5 h-5 ${product.isFavorited ? 'fill-current' : ''}`} />
@@ -370,7 +378,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-0 lg:pt-6 lg:px-4 grid lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto pt-16 lg:pt-6 lg:px-4 grid lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
