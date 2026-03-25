@@ -1,6 +1,7 @@
 import React, { Key } from 'react';
-import { Heart, MapPin, ShieldCheck } from 'lucide-react';
+import { Heart, MapPin, ShieldCheck, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
+import { formatDistanceToNow } from 'date-fns';
 
 import { getOptimizedImageUrl } from '../lib/imageUtils';
 import { LazyImage } from './LazyImage';
@@ -15,17 +16,28 @@ interface ListingCardProps {
   isPromoted?: boolean;
   isFavorited?: boolean;
   likesCount?: number;
+  is_ad?: boolean;
+  postedAt?: string;
   viewMode?: 'grid' | 'list';
   key?: Key;
   onClick?: () => void;
   onFavorite?: (e: React.MouseEvent) => void;
 }
 
-export const ListingCard = React.memo(({ title, price, location, image, category, categoryIcon, isPromoted, isFavorited, likesCount, viewMode = 'grid', onClick, onFavorite }: ListingCardProps) => {
+export const ListingCard = React.memo(({ title, price, location, image, category, categoryIcon, isPromoted, isFavorited, likesCount, is_ad, postedAt, viewMode = 'grid', onClick, onFavorite }: ListingCardProps) => {
   const optimizedImage = React.useMemo(() => getOptimizedImageUrl(image, { 
     width: viewMode === 'grid' ? 300 : 200,
     height: viewMode === 'grid' ? 225 : 150
   }), [image, viewMode]);
+
+  const timeAgo = React.useMemo(() => {
+    if (!postedAt) return null;
+    try {
+      return formatDistanceToNow(new Date(postedAt), { addSuffix: true });
+    } catch (e) {
+      return null;
+    }
+  }, [postedAt]);
 
   if (viewMode === 'grid') {
     return (
@@ -66,12 +78,17 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 e.stopPropagation();
                 onFavorite?.(e);
               }}
-              className={`flex items-center gap-1 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
             >
-              {likesCount !== undefined && likesCount > 0 && (
-                <span className="text-[10px] font-black">{likesCount}</span>
+              <div className="flex items-center gap-1">
+                {likesCount !== undefined && likesCount > 0 && (
+                  <span className="text-[10px] font-black">{likesCount}</span>
+                )}
+                <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+              </div>
+              {is_ad && (
+                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
               )}
-              <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
             </button>
           </div>
           <div className="flex flex-col gap-0.5 sm:gap-1">
@@ -82,6 +99,12 @@ export const ListingCard = React.memo(({ title, price, location, image, category
               <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
               <span className="truncate">{location}</span>
             </div>
+            {timeAgo && (
+              <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[10px] mt-0.5">
+                <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
+                <span>{timeAgo}</span>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
@@ -127,18 +150,29 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 e.stopPropagation();
                 onFavorite?.(e);
               }}
-              className={`flex items-center gap-1 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
             >
-              {likesCount !== undefined && likesCount > 0 && (
-                <span className="text-[10px] sm:text-xs font-black">{likesCount}</span>
+              <div className="flex items-center gap-1">
+                {likesCount !== undefined && likesCount > 0 && (
+                  <span className="text-[10px] sm:text-xs font-black">{likesCount}</span>
+                )}
+                <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+              </div>
+              {is_ad && (
+                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
               )}
-              <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
             </button>
           </div>
           <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 uppercase font-bold tracking-wider">
             <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
             <span className="truncate">{location}</span>
           </div>
+          {timeAgo && (
+            <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[9px] mt-0.5 font-medium">
+              <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
+              <span>{timeAgo}</span>
+            </div>
+          )}
         </div>
         <div className="flex justify-between items-end">
           <span className="text-base sm:text-xl font-black text-emerald-600">

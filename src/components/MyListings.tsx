@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Package, Trash2, ExternalLink, CheckCircle2, RefreshCw, AlertCircle, Edit3, User, Heart, Star, MessageSquare, Loader2 } from 'lucide-react';
+import { Package, Trash2, ExternalLink, CheckCircle2, RefreshCw, AlertCircle, Edit3, User, Heart, Star, MessageSquare, Loader2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
+import { formatDistanceToNow } from 'date-fns';
 import { Listing, Review } from '../types';
 import { api } from '../services/api';
 import { supabase } from '../lib/supabase';
@@ -318,7 +319,15 @@ export const MyListings = ({ user, onBack, onViewProduct, onEditProfile }: MyLis
                         </span>
                       </div>
                       <p className="text-emerald-600 font-black text-lg">Br{listing.price.toLocaleString()}</p>
-                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mt-1">{listing.location}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{listing.location}</p>
+                        {listing.postedAt && (
+                          <div className="flex items-center gap-1 text-[10px] text-gray-400 font-medium">
+                            <Clock className="w-2.5 h-2.5" />
+                            <span>{formatDistanceToNow(new Date(listing.postedAt), { addSuffix: true })}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 mt-4 flex-wrap">
@@ -393,6 +402,7 @@ export const MyListings = ({ user, onBack, onViewProduct, onEditProfile }: MyLis
                   categoryIcon={listing.categoryIcon}
                   isPromoted={listing.isPromoted}
                   isFavorited={true}
+                  postedAt={listing.postedAt}
                   viewMode="grid"
                   onClick={() => onViewProduct(listing)}
                   onFavorite={() => handleToggleFavorite(listing.id)}

@@ -24,6 +24,9 @@ export interface Listing {
   views?: number;
   likes_count?: number;
   isFavorited?: boolean;
+  is_ad?: boolean;
+  ad_row?: number;
+  ad_col?: number;
 }
 
 export interface User {

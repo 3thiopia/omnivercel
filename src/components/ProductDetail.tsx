@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
+import { formatDistanceToNow } from 'date-fns';
 import { 
   ArrowLeft, 
   Share2, 
@@ -60,6 +61,15 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+  const timeAgo = useMemo(() => {
+    if (!product.postedAt) return null;
+    try {
+      return formatDistanceToNow(new Date(product.postedAt), { addSuffix: true });
+    } catch (e) {
+      return null;
+    }
+  }, [product.postedAt]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -430,7 +440,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 </div>
                 <span className="text-gray-400 text-xs font-medium flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
-                  {product.postedAt || 'Recently'}
+                  {timeAgo || 'Recently'}
                 </span>
               </div>
               

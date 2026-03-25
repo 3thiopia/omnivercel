@@ -25,6 +25,28 @@ const ChatView = lazy(() => import('./components/ChatView').then(m => ({ default
 const listingsCache = new Map<string, { data: Listing[], timestamp: number }>();
 const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 
+function useWindowSize() {
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
+
+  useEffect(() => {
+    function handleResize() {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+    
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return windowSize;
+}
+
 export default function App() {
   const [isPostAdOpen, setIsPostAdOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
@@ -55,6 +77,45 @@ export default function App() {
   const [subRegionFilter, setSubRegionFilter] = useState<string>('');
   const [isDeletingListing, setIsDeletingListing] = useState<string | number | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  const { width } = useWindowSize();
+  const columns = useMemo(() => {
+    if (width >= 1280) return 5; // xl:grid-cols-5
+    if (width >= 1024) return 4; // lg:grid-cols-4
+    if (width >= 640) return 3;  // sm:grid-cols-3
+    return 2;                    // grid-cols-2
+  }, [width]);
+
+  const processedListings = useMemo(() => {
+    if (viewMode === 'list') return listings;
+    
+    const regularListings = listings.filter(l => !l.is_ad);
+    const ads = listings.filter(l => l.is_ad);
+    
+    if (ads.length === 0) return listings;
+    
+    const result = [...regularListings];
+    // Sort ads by row then col to ensure consistent injection
+    const sortedAds = [...ads].sort((a, b) => {
+      const rowA = a.ad_row || 0;
+      const rowB = b.ad_row || 0;
+      const colA = a.ad_col || 0;
+      const colB = b.ad_col || 0;
+      if (rowA !== rowB) return rowA - rowB;
+      return colA - colB;
+    });
+    
+    sortedAds.forEach(ad => {
+      if (ad.ad_row && ad.ad_col) {
+        const index = (ad.ad_row - 1) * columns + (ad.ad_col - 1);
+        if (index >= 0 && index <= result.length) {
+          result.splice(index, 0, ad);
+        }
+      }
+    });
+    
+    return result;
+  }, [listings, columns, viewMode]);
 
   useEffect(() => {
     if (isAdminView && userProfile && userProfile.role !== 'admin') {
@@ -825,12 +886,12 @@ export default function App() {
               <div className="flex justify-center py-20 col-span-full">
                 <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
-            ) : listings.length === 0 ? (
+            ) : processedListings.length === 0 ? (
               <div className="text-center py-20 col-span-full">
                 <p className="text-gray-500 font-medium">No listings found. Be the first to sell!</p>
               </div>
             ) : (
-              listings.map((listing) => (
+              processedListings.map((listing) => (
                 <ListingCard 
                   key={listing.id} 
                   title={listing.title}
@@ -842,6 +903,8 @@ export default function App() {
                   isPromoted={listing.isPromoted}
                   isFavorited={listing.isFavorited}
                   likesCount={listing.likes_count}
+                  is_ad={listing.is_ad}
+                  postedAt={listing.postedAt}
                   viewMode={viewMode} 
                   onClick={() => handleOpenListing(listing.id)}
                   onFavorite={() => handleToggleFavorite(listing.id)}

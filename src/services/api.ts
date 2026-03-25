@@ -45,6 +45,11 @@ export interface Report {
     title: string;
     thumbnail_url: string;
     seller_id?: string;
+    status?: string;
+    seller?: {
+      id: string;
+      status: string;
+    };
   };
   reporter?: {
     id: string;
@@ -274,6 +279,9 @@ export const api = {
         categoryIcon: item.category_data?.icon,
         postedAt: item.created_at,
         isPromoted: item.is_promoted,
+        is_ad: item.is_ad,
+        ad_row: item.ad_row,
+        ad_col: item.ad_col,
         likes_count: item.favorites?.[0]?.count || 0
       }));
 
@@ -340,7 +348,10 @@ export const api = {
         categoryIcon: data.category_data?.icon,
         postedAt: data.created_at,
         isPromoted: data.is_promoted,
-        isFavorited
+        isFavorited,
+        is_ad: data.is_ad,
+        ad_row: data.ad_row,
+        ad_col: data.ad_col
       };
     },
     create: async (listing: any, _token?: string): Promise<Listing> => {
@@ -376,17 +387,21 @@ export const api = {
       return data as Listing;
     },
     update: async (id: string | number, updates: any, _token?: string): Promise<Listing> => {
+      const updateData: any = {};
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.price !== undefined) updateData.price = updates.price;
+      if (updates.location !== undefined) updateData.location = updates.location;
+      if (updates.image !== undefined) updateData.thumbnail_url = updates.image;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.category_id !== undefined) updateData.category_id = updates.category_id;
+      if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.is_ad !== undefined) updateData.is_ad = updates.is_ad;
+      if (updates.ad_row !== undefined) updateData.ad_row = updates.ad_row;
+      if (updates.ad_col !== undefined) updateData.ad_col = updates.ad_col;
+
       const { data, error } = await supabase
         .from('listings')
-        .update({
-          title: updates.title,
-          price: updates.price,
-          location: updates.location,
-          thumbnail_url: updates.image,
-          description: updates.description,
-          category_id: updates.category_id,
-          status: updates.status
-        })
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
@@ -474,8 +489,7 @@ export const api = {
       return [
         { label: 'Total Listings', value: (listingsCount || 0).toString(), change: '+12%', icon: 'Package', color: 'text-blue-600', bg: 'bg-blue-50' },
         { label: 'Active Users', value: (usersCount || 0).toString(), change: '+5%', icon: 'User', color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Pending Reports', value: (reportsCount || 0).toString(), change: '-2%', icon: 'ShieldCheck', color: 'text-red-600', bg: 'bg-red-50' },
-        { label: 'Revenue', value: '$12,450', change: '+18%', icon: 'ArrowUpDown', color: 'text-purple-600', bg: 'bg-purple-50' }
+        { label: 'Pending Reports', value: (reportsCount || 0).toString(), change: '-2%', icon: 'ShieldCheck', color: 'text-red-600', bg: 'bg-red-50' }
       ];
     },
   },
@@ -814,7 +828,14 @@ export const api = {
         .from('reports')
         .select(`
           *,
-          listing:listings(id, title, thumbnail_url, seller_id),
+          listing:listings(
+            id, 
+            title, 
+            thumbnail_url, 
+            seller_id, 
+            status,
+            seller:profiles(id, status)
+          ),
           reporter:profiles!reports_reporter_id_fkey(id, full_name, email)
         `)
         .order('created_at', { ascending: false });
