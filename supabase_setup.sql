@@ -51,6 +51,7 @@ CREATE TABLE listings (
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'sold', 'hidden', 'deleted')),
   seller_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  likes_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -156,7 +157,9 @@ CREATE POLICY "Owner Manage Listings" ON listings FOR ALL USING (auth.uid() = se
 CREATE POLICY "Owner Manage Images" ON listing_images FOR ALL USING (
   EXISTS (SELECT 1 FROM listings WHERE id = listing_id AND seller_id = auth.uid())
 );
-CREATE POLICY "Owner Manage Favorites" ON favorites FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Public Read Favorites" ON favorites FOR SELECT USING (true);
+CREATE POLICY "Owner Manage Favorites" ON favorites FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Owner Delete Favorites" ON favorites FOR DELETE USING (auth.uid() = user_id);
 CREATE POLICY "Participant Manage Conversations" ON conversations FOR ALL USING (auth.uid() IN (buyer_id, seller_id));
 CREATE POLICY "Sender Manage Messages" ON messages FOR ALL USING (auth.uid() = sender_id);
 CREATE POLICY "Reviewer Manage Reviews" ON reviews FOR ALL USING (auth.uid() = reviewer_id);
@@ -183,7 +186,26 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 14. Seed Categories
+-- 14. Likes Count Trigger
+CREATE OR REPLACE FUNCTION public.handle_favorite_change()
+RETURNS trigger AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    UPDATE public.listings SET likes_count = likes_count + 1 WHERE id = new.listing_id;
+    RETURN new;
+  ELSIF (TG_OP = 'DELETE') THEN
+    UPDATE public.listings SET likes_count = likes_count - 1 WHERE id = old.listing_id;
+    RETURN old;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_favorite_change
+  AFTER INSERT OR DELETE ON public.favorites
+  FOR EACH ROW EXECUTE FUNCTION public.handle_favorite_change();
+
+-- 15. Seed Categories
 INSERT INTO categories (name, icon) VALUES
 ('Mobile Phones', '📱'), ('Vehicles', '🚗'), ('Property', '🏠'), 
 ('Electronics', '💻'), ('Home & Garden', '🛋️'), ('Fashion', '👕'), 

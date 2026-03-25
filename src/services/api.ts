@@ -44,6 +44,7 @@ export interface Report {
     id: string;
     title: string;
     thumbnail_url: string;
+    price?: number;
     seller_id?: string;
     status?: string;
     seller?: {
@@ -215,8 +216,7 @@ export const api = {
         .select(`
           *,
           category_data:categories(name, icon),
-          profiles(full_name),
-          favorites(count)
+          profiles(full_name)
         `);
 
       // 1. Status Filter
@@ -282,7 +282,7 @@ export const api = {
         is_ad: item.is_ad,
         ad_row: item.ad_row,
         ad_col: item.ad_col,
-        likes_count: item.favorites?.[0]?.count || 0
+        likes_count: item.likes_count || 0
       }));
 
       // 6. Memory Sort for likes_count (since Supabase can't easily sort by related count)
@@ -714,7 +714,7 @@ export const api = {
 
       return data;
     },
-    sendMessage: async (conversationId: string, content: string, _token: string): Promise<any> => {
+    sendMessage: async (conversationId: string, content: string, _token: string, imageUrl?: string): Promise<any> => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Unauthorized');
 
@@ -723,7 +723,8 @@ export const api = {
         .insert([{
           conversation_id: conversationId,
           sender_id: session.user.id,
-          content
+          content,
+          image_url: imageUrl
         }])
         .select()
         .single();

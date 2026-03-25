@@ -645,7 +645,6 @@ export default function App() {
               user={user}
               onBack={() => setActiveTab('home')}
               onViewProduct={(listing) => handleOpenListing(listing.id)}
-              onEditProfile={() => setActiveTab('profile')}
             />
           ) : activeTab === 'profile' ? (
             <ProfileView 
@@ -658,6 +657,7 @@ export default function App() {
             <ChatView 
               initialConversationId={pendingConversationId} 
               onConversationSelected={() => setPendingConversationId(null)}
+              onBack={() => setActiveTab('home')}
             />
           ) : (
             <>

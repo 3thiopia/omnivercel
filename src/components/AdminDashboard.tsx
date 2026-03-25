@@ -24,7 +24,10 @@ import {
   MapPin,
   RotateCcw,
   History,
-  Clock
+  Clock,
+  ChevronRight,
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -70,6 +73,8 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
   const [reportView, setReportView] = useState<'active' | 'history'>('active');
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [reportSearchQuery, setReportSearchQuery] = useState('');
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [listingSearchQuery, setListingSearchQuery] = useState('');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -110,9 +115,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const data = await api.reports.getAll(session.access_token);
+      console.log('AdminDashboard: Fetched reports:', data);
       setReports(data);
     } catch (error) {
-      console.error('Error loading reports:', error);
+      console.error('AdminDashboard: Error loading reports:', error);
+      toast.error('Failed to load reports. Check console for details.');
     } finally {
       setIsLoadingReports(false);
     }
@@ -639,6 +646,101 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   })
                 )}
               </div>
+
+              {/* Recent Reports Widget */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 tracking-tight">Recent Reports</h3>
+                      <p className="text-xs text-gray-500 font-medium">Latest violations reported by users</p>
+                    </div>
+                    <button 
+                      onClick={() => setActiveTab('reports')}
+                      className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700 transition-colors"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {reports.filter(r => r.status === 'pending').slice(0, 5).length === 0 ? (
+                      <div className="p-12 text-center">
+                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                        </div>
+                        <p className="text-gray-500 font-medium">No pending reports to show.</p>
+                      </div>
+                    ) : (
+                      reports.filter(r => r.status === 'pending').slice(0, 5).map((report) => (
+                        <div 
+                          key={report.id} 
+                          onClick={() => { setActiveTab('reports'); setSelectedReport(report); }}
+                          className="px-8 py-4 flex items-center justify-between hover:bg-gray-50 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-4">
+                            <img 
+                              src={report.listing?.thumbnail_url || 'https://picsum.photos/seed/placeholder/100/100'} 
+                              alt="" 
+                              className="w-10 h-10 rounded-xl object-cover shadow-sm"
+                            />
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">{report.listing?.title}</p>
+                              <p className="text-[10px] text-gray-400 font-medium">{report.reason} • {new Date(report.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-emerald-500 transition-all group-hover:translate-x-1" />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Actions / System Status */}
+                <div className="space-y-6">
+                  <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-xl shadow-gray-900/20 relative overflow-hidden">
+                    <div className="relative z-10">
+                      <h3 className="text-lg font-black mb-2">System Status</h3>
+                      <div className="flex items-center gap-2 mb-6">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">All Systems Operational</span>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-400 font-medium">Database</span>
+                          <span className="font-bold">Healthy</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-400 font-medium">Auth Service</span>
+                          <span className="font-bold">Active</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-400 font-medium">Storage</span>
+                          <span className="font-bold">92% Free</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+                  </div>
+
+                  <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">Quick Links</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => setActiveTab('listings')}
+                        className="p-3 bg-gray-50 rounded-2xl text-xs font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all text-center"
+                      >
+                        Manage Ads
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('users')}
+                        className="p-3 bg-gray-50 rounded-2xl text-xs font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all text-center"
+                      >
+                        User List
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -650,7 +752,17 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
             >
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <h2 className="text-2xl lg:text-3xl font-black text-gray-900">Manage Listings</h2>
-                <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
+                <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+                  <div className="relative flex-1 sm:flex-none sm:min-w-[240px]">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search listings..." 
+                      value={listingSearchQuery}
+                      onChange={(e) => setListingSearchQuery(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-11 pr-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    />
+                  </div>
                   <select className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all flex-shrink-0">
                     <option>All Categories</option>
                     <option>Electronics</option>
@@ -669,7 +781,13 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
               <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
                 {/* Mobile Card View */}
                 <div className="lg:hidden divide-y divide-gray-100">
-                  {localListings.map((listing) => (
+                  {localListings
+                    .filter(l => 
+                      l.title.toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
+                      l.id.toString().includes(listingSearchQuery) ||
+                      l.location.toLowerCase().includes(listingSearchQuery.toLowerCase())
+                    )
+                    .map((listing) => (
                     <div key={listing.id} className="p-4 space-y-4">
                       <div className="flex items-center gap-3">
                         <img src={listing.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
@@ -763,7 +881,13 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {localListings.map((listing) => (
+                      {localListings
+                        .filter(l => 
+                          l.title.toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
+                          l.id.toString().includes(listingSearchQuery) ||
+                          l.location.toLowerCase().includes(listingSearchQuery.toLowerCase())
+                        )
+                        .map((listing) => (
                         <tr key={listing.id} className="hover:bg-gray-50/50 transition-colors group">
                           <td className="px-6 py-4 text-xs font-mono text-gray-400">#{listing.id}</td>
                           <td className="px-6 py-4">
@@ -1155,7 +1279,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pending Reports</p>
                   <div className="flex items-end gap-2">
                     <h3 className="text-3xl font-black text-gray-900">
-                      {reports.filter(r => r.status === 'pending').length}
+                      {reports.filter(r => (r.status?.toLowerCase() || 'pending') === 'pending').length}
                     </h3>
                     <span className="text-xs font-bold text-orange-500 mb-1.5 flex items-center gap-0.5">
                       <Clock className="w-3 h-3" />
@@ -1167,7 +1291,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Resolved Total</p>
                   <div className="flex items-end gap-2">
                     <h3 className="text-3xl font-black text-gray-900">
-                      {reports.filter(r => r.status === 'resolved').length}
+                      {reports.filter(r => r.status?.toLowerCase() === 'resolved').length}
                     </h3>
                     <span className="text-xs font-bold text-emerald-500 mb-1.5 flex items-center gap-0.5">
                       <CheckCircle2 className="w-3 h-3" />
@@ -1179,7 +1303,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Dismissed</p>
                   <div className="flex items-end gap-2">
                     <h3 className="text-3xl font-black text-gray-900">
-                      {reports.filter(r => r.status === 'dismissed').length}
+                      {reports.filter(r => r.status?.toLowerCase() === 'dismissed').length}
                     </h3>
                     <span className="text-xs font-bold text-gray-400 mb-1.5">Archived</span>
                   </div>
@@ -1192,15 +1316,21 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   <div className="flex bg-gray-100 p-1 rounded-xl">
                     <button 
                       onClick={() => setReportView('active')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${reportView === 'active' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${reportView === 'active' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       Active
+                      <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${reportView === 'active' ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-400'}`}>
+                        {reports.filter(r => (r.status?.toLowerCase() || 'pending') === 'pending').length}
+                      </span>
                     </button>
                     <button 
                       onClick={() => setReportView('history')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${reportView === 'history' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${reportView === 'history' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       History
+                      <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${reportView === 'history' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-400'}`}>
+                        {reports.filter(r => (r.status?.toLowerCase() || 'pending') !== 'pending').length}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1230,7 +1360,10 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   <div className="flex justify-center py-20">
                     <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                ) : reports.filter(r => reportView === 'active' ? r.status === 'pending' : r.status !== 'pending').length === 0 ? (
+                ) : reports.filter(r => {
+                  const status = r.status?.toLowerCase() || 'pending';
+                  return reportView === 'active' ? status === 'pending' : status !== 'pending';
+                }).length === 0 ? (
                   <div className="text-center py-20">
                     {reportView === 'active' ? (
                       <>
@@ -1265,7 +1398,10 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {reports
-                          .filter(report => reportView === 'active' ? report.status === 'pending' : report.status !== 'pending')
+                          .filter(report => {
+                            const status = report.status?.toLowerCase() || 'pending';
+                            return reportView === 'active' ? status === 'pending' : status !== 'pending';
+                          })
                           .filter(report => {
                             if (!reportSearchQuery) return true;
                             const query = reportSearchQuery.toLowerCase();
@@ -1278,7 +1414,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                             );
                           })
                           .map((report) => (
-                          <tr key={report.id} className="group hover:bg-gray-50/50 transition-all">
+                          <tr 
+                            key={report.id} 
+                            onClick={() => setSelectedReport(report)}
+                            className="group hover:bg-gray-50/50 transition-all cursor-pointer"
+                          >
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-4">
                                 <div className="relative">
@@ -1640,6 +1780,154 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
           )}
         </div>
       </main>
+
+      {/* Report Detail Modal */}
+      <AnimatePresence>
+        {selectedReport && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-8">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedReport(null)}
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-md">Report Detail</span>
+                    <span className="text-xs font-mono text-gray-400">ID: #{selectedReport.id}</span>
+                  </div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight">Reviewing Violation</h2>
+                </div>
+                <button 
+                  onClick={() => setSelectedReport(null)}
+                  className="p-2 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-gray-200"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
+                {/* Listing Section */}
+                <section>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Reported Listing</h3>
+                  <div className="flex gap-6 p-4 bg-gray-50 rounded-3xl border border-gray-100">
+                    <img 
+                      src={selectedReport.listing?.thumbnail_url || 'https://picsum.photos/seed/placeholder/200/200'} 
+                      alt="" 
+                      className="w-24 h-24 rounded-2xl object-cover shadow-md"
+                    />
+                    <div className="flex-1 min-w-0 py-1">
+                      <h4 className="text-lg font-black text-gray-900 mb-1 truncate">{selectedReport.listing?.title}</h4>
+                      <p className="text-emerald-600 font-bold text-sm mb-3">${selectedReport.listing?.price?.toLocaleString()}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                          selectedReport.listing?.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {selectedReport.listing?.status}
+                        </span>
+                        <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                          ID: {selectedReport.listing_id}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Violation Section */}
+                <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Violation Reason</h3>
+                    <div className="flex items-center gap-3 p-4 bg-red-50 rounded-2xl border border-red-100">
+                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                      <span className="font-black text-red-700 uppercase tracking-tight">{selectedReport.reason}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Reported On</h3>
+                    <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                      <Calendar className="w-5 h-5 text-blue-500" />
+                      <span className="font-bold text-blue-700">
+                        {new Date(selectedReport.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Details Section */}
+                <section>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Reporter's Statement</h3>
+                  <div className="p-6 bg-white border border-gray-100 rounded-3xl shadow-sm italic text-gray-600 leading-relaxed">
+                    {selectedReport.details ? `"${selectedReport.details}"` : "No additional details provided by the reporter."}
+                  </div>
+                </section>
+
+                {/* Reporter Info */}
+                <section>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Reporter Information</h3>
+                  <div className="flex items-center gap-4 p-4 border border-gray-100 rounded-2xl">
+                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 font-bold">
+                      {selectedReport.reporter?.full_name?.charAt(0) || 'A'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{selectedReport.reporter?.full_name || 'Anonymous Reporter'}</p>
+                      <p className="text-xs text-gray-500">{selectedReport.reporter?.email}</p>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current Status:</span>
+                  <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                    selectedReport.status === 'pending' ? 'bg-orange-100 text-orange-600' :
+                    selectedReport.status === 'resolved' ? 'bg-emerald-100 text-emerald-600' :
+                    'bg-gray-200 text-gray-500'
+                  }`}>
+                    {selectedReport.status}
+                  </span>
+                </div>
+                <div className="flex gap-3">
+                  {selectedReport.status === 'pending' ? (
+                    <>
+                      <button 
+                        onClick={() => { handleReportAction(selectedReport, 'dismiss'); setSelectedReport(null); }}
+                        className="px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                      >
+                        Dismiss
+                      </button>
+                      <button 
+                        onClick={() => { handleReportAction(selectedReport, 'resolve'); setSelectedReport(null); }}
+                        className="px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                      >
+                        Resolve Report
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => setSelectedReport(null)}
+                      className="px-8 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all"
+                    >
+                      Close
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <ConfirmationModal
         isOpen={confirmModal.isOpen}

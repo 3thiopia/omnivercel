@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { MessageCircle, Send, User, ArrowLeft, Loader2, Package, Search, Trash2, Check, CheckCheck } from 'lucide-react';
+import { MessageCircle, Send, User, ArrowLeft, Loader2, Package, Search, Trash2, Check, CheckCheck, RefreshCw, Image as ImageIcon, X, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../services/api';
 import { supabase } from '../lib/supabase';
@@ -12,6 +12,7 @@ interface Message {
   created_at: string;
   conversation_id: string;
   is_read?: boolean;
+  image_url?: string;
 }
 
 interface Conversation {
@@ -40,13 +41,17 @@ interface Conversation {
 interface ChatViewProps {
   initialConversationId?: string | null;
   onConversationSelected?: () => void;
+  onBack?: () => void;
 }
 
-export const ChatView = ({ initialConversationId, onConversationSelected }: ChatViewProps) => {
+export const ChatView = ({ initialConversationId, onConversationSelected, onBack }: ChatViewProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -281,19 +286,74 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
 
   const [isSending, setIsSending] = useState(false);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB');
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `chat-attachments/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('listings')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('listings')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      return null;
+    }
+  };
+
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation?.id || !currentUserId || isSending) return;
+    if ((!newMessage.trim() && !selectedImage) || !selectedConversation?.id || !currentUserId || isSending) return;
 
     const content = newMessage.trim();
+    const imageToUpload = selectedImage;
+    
     setNewMessage('');
+    setSelectedImage(null);
+    setImagePreview(null);
     setIsSending(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      const message = await api.chats.sendMessage(selectedConversation.id, content, session.access_token);
+      let imageUrl = undefined;
+      if (imageToUpload) {
+        setIsUploading(true);
+        imageUrl = await uploadImage(imageToUpload);
+        setIsUploading(false);
+        if (!imageUrl) {
+          alert('Failed to upload image. Please try again.');
+          setIsSending(false);
+          return;
+        }
+      }
+
+      const message = await api.chats.sendMessage(selectedConversation.id, content, session.access_token, imageUrl || undefined);
       setMessages(prev => [...prev, message]);
       
       // Update conversations list locally for instant feedback
@@ -302,7 +362,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
           if (c.id === selectedConversation.id) {
             return {
               ...c,
-              last_message: content,
+              last_message: imageUrl ? '📷 Photo' : content,
               last_message_at: new Date().toISOString()
             };
           }
@@ -336,17 +396,52 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto h-[calc(100vh-3.5rem)] md:h-[calc(100vh-12rem)] flex bg-white rounded-none md:rounded-[2.5rem] border-none md:border border-gray-100 shadow-none md:shadow-sm overflow-hidden">
-      {/* Sidebar */}
-      <div className={`w-full md:w-96 border-r border-gray-100 flex flex-col bg-white ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-4 md:p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-4 md:mb-6">
-            <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Chats</h2>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <MessageCircle className="w-5 h-5" />
+    <div className="w-full max-w-6xl mx-auto flex flex-col h-[calc(100vh-3.5rem)] md:h-[calc(100vh-12rem)] bg-white rounded-none md:rounded-[2.5rem] border-none md:border border-gray-100 shadow-none md:shadow-sm overflow-hidden">
+      {/* Native-style Sticky Header (Mobile Only) */}
+      <div className="md:hidden sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              if (selectedConversation) {
+                setSelectedConversation(null);
+              } else if (onBack) {
+                onBack();
+              }
+            }} 
+            className="p-2 -ml-2 text-gray-900 hover:bg-gray-100 rounded-full transition-colors active:scale-95"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h1 className="text-lg font-black text-gray-900 tracking-tight">
+            {selectedConversation ? selectedConversation.other_user?.full_name : 'Messages'}
+          </h1>
+        </div>
+        <button 
+          onClick={() => {
+            if (selectedConversation) {
+              fetchMessages(selectedConversation.all_conversation_ids || [selectedConversation.id]);
+            } else {
+              fetchConversations();
+            }
+          }}
+          className={`p-2 -mr-2 text-gray-900 hover:bg-gray-100 rounded-full transition-all active:scale-95 ${isLoading || isMessagesLoading ? 'opacity-50' : ''}`}
+          disabled={isLoading || isMessagesLoading}
+        >
+          <RefreshCw className={`w-5 h-5 ${(isLoading || isMessagesLoading) ? 'animate-spin text-emerald-500' : ''}`} />
+        </button>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className={`w-full md:w-96 border-r border-gray-100 flex flex-col bg-white ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-4 md:p-6 border-b border-gray-100">
+            <div className="hidden md:flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Chats</h2>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                <MessageCircle className="w-5 h-5" />
+              </div>
             </div>
-          </div>
-          <div className="relative group">
+            <div className="relative group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
             <input 
               type="text"
@@ -427,7 +522,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="px-4 md:px-6 py-3 md:py-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+            <div className="hidden md:flex px-4 md:px-6 py-3 md:py-4 bg-white/80 backdrop-blur-md border-b border-gray-100 items-center justify-between sticky top-0 z-10 shadow-sm">
               <div className="flex items-center gap-3 md:gap-4">
                 <button 
                   onClick={() => setSelectedConversation(null)}
@@ -539,6 +634,17 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                                 'rounded-[1.5rem] rounded-tl-lg rounded-bl-lg'
                               }`
                         }`}>
+                          {msg.image_url && (
+                            <div className="mb-2 rounded-xl overflow-hidden border border-black/5 bg-gray-50 max-w-[300px]">
+                              <img 
+                                src={getOptimizedImageUrl(msg.image_url, { width: 600, height: 450 })} 
+                                alt="Attachment" 
+                                className="w-full h-auto object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                                onClick={() => window.open(msg.image_url, '_blank')}
+                              />
+                            </div>
+                          )}
                           {msg.content.includes('[PRODUCT_IMAGE]') ? (
                             <div className="space-y-2">
                               <p>{msg.content.split('[PRODUCT_IMAGE]')[0]}</p>
@@ -601,7 +707,37 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
 
             {/* Input Area */}
             <div className="p-3 pb-10 md:p-4 bg-white border-t border-gray-100">
+              {imagePreview && (
+                <div className="mb-3 relative inline-block">
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-emerald-500/20 shadow-lg">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                    }}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-2 md:gap-3 bg-gray-50 p-1.5 md:p-2 rounded-[2rem] border border-gray-100 focus-within:ring-4 focus-within:ring-emerald-500/5 transition-all">
+                <label className="p-2 md:p-3 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-full transition-all cursor-pointer active:scale-90">
+                  <ImageIcon className="w-5 h-5" />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageSelect}
+                  />
+                </label>
                 <input 
                   type="text"
                   value={newMessage}
@@ -609,12 +745,12 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
                     setNewMessage(e.target.value);
                     handleTyping();
                   }}
-                  placeholder="Message..."
-                  className="flex-1 bg-transparent border-none py-2 md:py-3 px-3 md:px-4 text-sm font-semibold focus:ring-0 outline-none placeholder:text-gray-400"
+                  placeholder={selectedImage ? "Add a caption..." : "Message..."}
+                  className="flex-1 bg-transparent border-none py-2 md:py-3 px-1 md:px-2 text-sm font-semibold focus:ring-0 outline-none placeholder:text-gray-400"
                 />
                 <button 
                   type="submit"
-                  disabled={!newMessage.trim() || isSending}
+                  disabled={(!newMessage.trim() && !selectedImage) || isSending}
                   className="w-10 h-10 md:w-12 md:h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
                   {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-4 h-4 md:w-5 h-5" />}
@@ -643,6 +779,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected }: Chat
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
