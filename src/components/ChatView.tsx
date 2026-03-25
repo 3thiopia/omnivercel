@@ -502,7 +502,9 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <p className={`text-xs truncate leading-relaxed flex-1 ${selectedConversation?.id === conv.id ? 'text-emerald-50' : 'text-gray-500'}`}>
-                      {conv.last_message || 'Start a conversation'}
+                      {conv.last_message?.includes('[PRODUCT_IMAGE]') 
+                        ? `${conv.last_message.split('[PRODUCT_IMAGE]')[0]} 📷 Photo`
+                        : conv.last_message || 'Start a conversation'}
                     </p>
                     {conv.unread_count > 0 && selectedConversation?.id !== conv.id && (
                       <div className="bg-emerald-500 text-white text-[10px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center shadow-sm">

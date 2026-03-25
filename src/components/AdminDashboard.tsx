@@ -179,13 +179,13 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
       } else if (action === 'activate') {
         if (report.listing_id) {
           await api.listings.update(report.listing_id, { status: 'active' }, token);
-          toast.success('Listing activated');
+          toast.success('Listing is now public again');
         }
       } else if (action === 'unban_seller') {
         const sellerId = report.listing?.seller_id;
         if (sellerId) {
           await api.users.updateStatus(sellerId, 'active', token);
-          toast.success('Seller unbanned');
+          toast.success('Seller has been unbanned');
         }
       } else if (action === 'delete') {
         if (report.listing_id) {
@@ -1489,71 +1489,99 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-end gap-1">
-                                {report.status === 'pending' ? (
-                                  <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
+                                <div className="flex items-center gap-1">
+                                  {/* Restore Action (if hidden) */}
+                                  {report.listing?.status === 'hidden' && (
                                     <button 
-                                      onClick={() => handleReportAction(report, 'unlist')}
-                                      className="p-2 text-orange-500 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                      title="Unlist Listing"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportAction(report, 'activate');
+                                      }}
+                                      className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest"
+                                      title="Make Listing Public Again"
                                     >
-                                      <XCircle className="w-4 h-4" />
+                                      <RotateCcw className="w-3 h-3" />
+                                      Restore
                                     </button>
+                                  )}
+                                  
+                                  {/* Unban Action (if banned) */}
+                                  {report.listing?.seller?.status === 'banned' && (
                                     <button 
-                                      onClick={() => handleReportAction(report, 'resolve')}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportAction(report, 'unban_seller');
+                                      }}
+                                      className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest"
+                                      title="Unban Seller"
+                                    >
+                                      <UserCheck className="w-3 h-3" />
+                                      Unban
+                                    </button>
+                                  )}
+                                </div>
+
+                                {report.status === 'pending' ? (
+                                  <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 ml-1">
+                                    {report.listing?.status === 'active' && (
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReportAction(report, 'unlist');
+                                        }}
+                                        className="p-2 text-orange-500 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                        title="Unlist Listing"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportAction(report, 'resolve');
+                                      }}
                                       className="p-2 text-emerald-500 hover:bg-white hover:shadow-sm rounded-lg transition-all"
                                       title="Mark as Resolved"
                                     >
                                       <CheckCircle2 className="w-4 h-4" />
                                     </button>
                                     <button 
-                                      onClick={() => handleReportAction(report, 'dismiss')}
-                                      className="p-2 text-gray-400 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportAction(report, 'dismiss');
+                                      }}
+                                      className="p-2 text-gray-400 hover:white hover:shadow-sm rounded-lg transition-all"
                                       title="Dismiss"
                                     >
                                       <XCircle className="w-4 h-4" />
                                     </button>
                                   </div>
-                                ) : (
-                                  <div className="flex items-center gap-1">
-                                    {report.listing?.status === 'hidden' && (
-                                      <button 
-                                        onClick={() => handleReportAction(report, 'activate')}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest"
-                                        title="Activate Listing"
-                                      >
-                                        <RotateCcw className="w-3 h-3" />
-                                        Restore
-                                      </button>
-                                    )}
-                                    {report.listing?.seller?.status === 'banned' && (
-                                      <button 
-                                        onClick={() => handleReportAction(report, 'unban_seller')}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all text-[10px] font-black uppercase tracking-widest"
-                                        title="Unban Seller"
-                                      >
-                                        <UserCheck className="w-3 h-3" />
-                                        Unban
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
+                                ) : null}
                                 
                                 <div className="h-4 w-[1px] bg-gray-200 mx-1"></div>
                                 
                                 <button 
-                                  onClick={() => handleReportAction(report, 'delete')}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReportAction(report, 'delete');
+                                  }}
                                   className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                   title="Delete Listing Permanently"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                                <button 
-                                  onClick={() => handleReportAction(report, 'ban')}
-                                  className="p-2 text-gray-400 hover:text-red-700 hover:bg-red-100 rounded-lg transition-all"
-                                  title="Ban Seller"
-                                >
-                                  <UserX className="w-4 h-4" />
-                                </button>
+                                {report.listing?.seller?.status !== 'banned' && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReportAction(report, 'ban');
+                                    }}
+                                    className="p-2 text-gray-400 hover:text-red-700 hover:bg-red-100 rounded-lg transition-all"
+                                    title="Ban Seller"
+                                  >
+                                    <UserX className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

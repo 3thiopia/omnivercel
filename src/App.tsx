@@ -12,7 +12,7 @@ import { ETHIOPIAN_LOCATIONS } from './constants/locations';
 import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { getOptimizedImageUrl } from './lib/imageUtils';
-import { PhoneVerificationModal } from './components/PhoneVerificationModal';
+import { ProfileCompletionModal } from './components/ProfileCompletionModal';
 
 // Lazy load heavy components
 const ProductDetail = lazy(() => import('./components/ProductDetail').then(m => ({ default: m.ProductDetail })));
@@ -20,6 +20,7 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m =
 const MyListings = lazy(() => import('./components/MyListings').then(m => ({ default: m.MyListings })));
 const ProfileView = lazy(() => import('./components/ProfileView').then(m => ({ default: m.ProfileView })));
 const ChatView = lazy(() => import('./components/ChatView').then(m => ({ default: m.ChatView })));
+const SellerProfileView = lazy(() => import('./components/SellerProfileView').then(m => ({ default: m.SellerProfileView })));
 
 // Simple cache for listings
 const listingsCache = new Map<string, { data: Listing[], timestamp: number }>();
@@ -77,6 +78,7 @@ export default function App() {
   const [subRegionFilter, setSubRegionFilter] = useState<string>('');
   const [isDeletingListing, setIsDeletingListing] = useState<string | number | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
 
   const { width } = useWindowSize();
   const columns = useMemo(() => {
@@ -209,6 +211,7 @@ export default function App() {
       const listing = await api.listings.getById(id);
       if (listing) {
         setSelectedProduct(listing);
+        setSelectedSellerId(null); // Close seller profile if opening a listing
         // Clear query param without reloading
         const url = new URL(window.location.href);
         url.searchParams.delete('listing');
@@ -217,6 +220,12 @@ export default function App() {
     } catch (err) {
       console.error('Error fetching shared listing:', err);
     }
+  };
+
+  const handleViewSellerProfile = (sellerId: string) => {
+    setSelectedSellerId(sellerId);
+    setSelectedProduct(null); // Close product detail
+    window.scrollTo(0, 0);
   };
 
   // Generate a unique cache key based on filters
@@ -302,10 +311,8 @@ export default function App() {
   const handleSellClick = () => {
     if (!user) {
       setIsAuthOpen(true);
-    } else if (!userProfile?.phone) {
-      setIsPhoneModalOpen(true);
     } else {
-      setIsPostAdOpen(true);
+      setIsPhoneModalOpen(true);
     }
   };
 
@@ -627,6 +634,16 @@ export default function App() {
               listings={listings} 
               onBack={() => setIsAdminView(false)} 
             />
+          ) : selectedSellerId ? (
+            <SellerProfileView
+              sellerId={selectedSellerId}
+              onBack={() => setSelectedSellerId(null)}
+              onOpenListing={handleOpenListing}
+              onContact={(sellerId) => {
+                setSelectedSellerId(null);
+                handleStartChat(sellerId);
+              }}
+            />
           ) : selectedProduct ? (
             <ProductDetail 
               product={selectedProduct} 
@@ -639,6 +656,7 @@ export default function App() {
               }}
               onDelete={handleDeleteListing}
               onFavorite={handleToggleFavorite}
+              onViewSellerProfile={handleViewSellerProfile}
             />
           ) : activeTab === 'items' ? (
             <MyListings 
@@ -652,6 +670,7 @@ export default function App() {
               onLogout={handleLogout} 
               onLogoutSuccess={handleLogoutSuccess}
               onBack={() => setActiveTab('home')}
+              onAdminClick={() => setIsAdminView(true)}
             />
           ) : activeTab === 'messages' ? (
             <ChatView 
@@ -1071,11 +1090,13 @@ export default function App() {
         onSuccess={() => {}} 
       />
 
-      <PhoneVerificationModal
+      <ProfileCompletionModal
         isOpen={isPhoneModalOpen}
         onClose={() => setIsPhoneModalOpen(false)}
-        onSuccess={(phone) => {
-          setUserProfile((prev: UserProfile | null) => prev ? { ...prev, phone } : null);
+        initialPhone={userProfile?.phone || ''}
+        initialLocation={userProfile?.location || ''}
+        onSuccess={(phone, location) => {
+          setUserProfile((prev: UserProfile | null) => prev ? { ...prev, phone, location } : null);
           setIsPostAdOpen(true);
         }}
       />

@@ -769,7 +769,7 @@ export const api = {
         
       if (error) throw error;
     },
-    createConversation: async (listingId: string | number, sellerId: string, _token: string): Promise<any> => {
+    createConversation: async (listingId: string | number, sellerId: string, _token: string, initialMessage?: string, productImageUrl?: string): Promise<any> => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Unauthorized');
 
@@ -788,6 +788,12 @@ export const api = {
           .from('conversations')
           .update({ listing_id: listingId })
           .eq('id', existing.id);
+        
+        // If it exists, we might still want to send the product context if it's a different listing
+        if (initialMessage && productImageUrl) {
+          await api.chats.sendMessage(existing.id, `${initialMessage} [PRODUCT_IMAGE]${productImageUrl}`, _token);
+        }
+        
         return existing;
       }
 
@@ -802,6 +808,12 @@ export const api = {
         .single();
 
       if (error) throw error;
+
+      // Send initial message if provided
+      if (initialMessage && productImageUrl) {
+        await api.chats.sendMessage(data.id, `${initialMessage} [PRODUCT_IMAGE]${productImageUrl}`, _token);
+      }
+
       return data;
     },
   },
@@ -829,15 +841,15 @@ export const api = {
         .from('reports')
         .select(`
           *,
-          listing:listings(
+          listing:listings!listing_id(
             id, 
             title, 
             thumbnail_url, 
             seller_id, 
             status,
-            seller:profiles(id, status)
+            seller:profiles!seller_id(id, status)
           ),
-          reporter:profiles!reports_reporter_id_fkey(id, full_name, email)
+          reporter:profiles!reporter_id(id, full_name, email)
         `)
         .order('created_at', { ascending: false });
 

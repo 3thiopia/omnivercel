@@ -7,6 +7,8 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent
@@ -21,7 +23,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../lib/supabase';
 import { api, Listing } from '../services/api';
-import { ETHIOPIAN_LOCATIONS } from '../constants/locations';
 
 interface PostAdModalProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ const SortablePhoto = ({ url, index, onRemove }: { url: string, index: number, o
       <div 
         {...attributes} 
         {...listeners}
-        className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-grab active:cursor-grabbing"
+        className="absolute inset-0 bg-black/20 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
       >
         <GripVertical className="w-6 h-6 text-white drop-shadow-md" />
       </div>
@@ -78,8 +79,6 @@ const SortablePhoto = ({ url, index, onRemove }: { url: string, index: number, o
   );
 };
 
-const ETHIOPIAN_REGIONS = ETHIOPIAN_LOCATIONS.map(l => l.name);
-
 export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdModalProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -89,16 +88,19 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   const [categories, setCategories] = useState<any[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedSubRegion, setSelectedSubRegion] = useState('');
-  
   const [selectedMainCategory, setSelectedMainCategory] = useState<string>('');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('');
   
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 10,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -123,15 +125,6 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
           const profile = await api.users.getMe(session.access_token);
           if (profile.location) {
             setFormData(prev => ({ ...prev, location: profile.location || '' }));
-            
-            if (profile.location.includes(', ')) {
-              const [region, subRegion] = profile.location.split(', ');
-              setSelectedRegion(region);
-              setSelectedSubRegion(subRegion);
-            } else {
-              setSelectedRegion(profile.location);
-              setSelectedSubRegion('');
-            }
           }
         }
       } catch (err) {
@@ -165,22 +158,10 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
           }
         }
         
-        // Parse location string (e.g., "Addis Ababa, Bole")
-        if (editListing.location.includes(', ')) {
-          const [region, subRegion] = editListing.location.split(', ');
-          setSelectedRegion(region);
-          setSelectedSubRegion(subRegion);
-        } else {
-          setSelectedRegion(editListing.location);
-          setSelectedSubRegion('');
-        }
-        
         setPreviews(editListing.images || (editListing.image ? [editListing.image] : []));
         setSelectedFiles([]);
       } else {
         setFormData({ title: '', category: '', price: '', location: '', description: '' });
-        setSelectedRegion('');
-        setSelectedSubRegion('');
         setSelectedMainCategory('');
         setSelectedSubCategory('');
         setPreviews([]);
@@ -195,16 +176,6 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
     const finalCategoryId = selectedSubCategory || selectedMainCategory;
     setFormData(prev => ({ ...prev, category: finalCategoryId }));
   }, [selectedMainCategory, selectedSubCategory]);
-
-  // Update location string when region or sub-region changes
-  useEffect(() => {
-    if (selectedRegion) {
-      const locationString = selectedSubRegion 
-        ? `${selectedRegion}, ${selectedSubRegion}` 
-        : selectedRegion;
-      setFormData(prev => ({ ...prev, location: locationString }));
-    }
-  }, [selectedRegion, selectedSubRegion]);
 
   // Fetch categories on open
   useEffect(() => {
@@ -680,8 +651,8 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Price First */}
+                    <div className="grid grid-cols-1 gap-4">
+                      {/* Price */}
                       <div className="relative group">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 group-focus-within:text-orange-500 transition-colors text-sm">Br</span>
                         <input
@@ -693,65 +664,15 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                           onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         />
                       </div>
-
-                      {/* Region */}
-                      <div className="relative group">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                        <select
-                          required
-                          className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm"
-                          value={selectedRegion}
-                          onChange={(e) => {
-                            setSelectedRegion(e.target.value);
-                            setSelectedSubRegion('');
-                          }}
-                        >
-                          <option value="">Select Region</option>
-                          {ETHIOPIAN_LOCATIONS.map((loc) => (
-                            <option key={loc.name} value={loc.name}>
-                              {loc.name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Sub-region (Full width on mobile, or side-by-side if we wanted, but full width is cleaner for long names) */}
-                    <AnimatePresence>
-                      {selectedRegion && ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="relative group"
-                        >
-                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-                          <select
-                            required
-                            className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm"
-                            value={selectedSubRegion}
-                            onChange={(e) => setSelectedSubRegion(e.target.value)}
-                          >
-                            <option value="">Select Sub-Region / City</option>
-                            {ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions?.map((sub) => (
-                              <option key={sub} value={sub}>
-                                {sub}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3">
+                      <MapPin className="w-5 h-5 text-emerald-500" />
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Listing Location</p>
+                        <p className="text-sm font-bold text-gray-700">{formData.location || 'Location not set'}</p>
+                      </div>
+                    </div>
 
                     <textarea
                       required

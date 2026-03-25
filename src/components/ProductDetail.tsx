@@ -21,7 +21,9 @@ import {
   X,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Copy,
+  PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -40,9 +42,10 @@ interface ProductDetailProps {
   onEdit?: (listing: Listing) => void;
   onDelete?: (listingId: string | number) => void;
   onFavorite?: (listingId: string | number) => void;
+  onViewSellerProfile?: (sellerId: string) => void;
 }
 
-export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onEdit, onDelete, onFavorite }: ProductDetailProps) => {
+export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onEdit, onDelete, onFavorite, onViewSellerProfile }: ProductDetailProps) => {
   const [activeImage, setActiveImage] = useState(product.image);
   const [relatedItems, setRelatedItems] = useState<Listing[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
@@ -195,7 +198,14 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         return;
       }
 
-      const conversation = await api.chats.createConversation(product.id, product.seller_id as string, session.access_token);
+      const initialMessage = `Hi, I'm interested in your item: ${product.title}`;
+      const conversation = await api.chats.createConversation(
+        product.id, 
+        product.seller_id as string, 
+        session.access_token,
+        initialMessage,
+        product.image
+      );
       if (conversation?.id) {
         if (onStartChat) {
           onStartChat(conversation.id);
@@ -212,9 +222,39 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
   };
 
   const [isReporting, setIsReporting] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const handleCopyPhone = () => {
+    if (sellerProfile?.phone) {
+      navigator.clipboard.writeText(sellerProfile.phone);
+      toast.success('Phone number copied to clipboard!');
+    }
+  };
+
+  const handleCall = () => {
+    if (sellerProfile?.phone) {
+      window.location.href = `tel:${sellerProfile.phone}`;
+    }
+  };
+
+  const handleContactClick = () => {
+    if (!sellerProfile?.phone) {
+      toast.error('This seller has not provided a phone number.');
+      return;
+    }
+    
+    // Check if on mobile (width < 1024px)
+    if (window.innerWidth < 1024) {
+      // Direct call on mobile as requested
+      handleCall();
+    } else {
+      // Show modal on desktop
+      setIsContactModalOpen(true);
+    }
+  };
 
   const handleReportAd = async () => {
     if (!reportReason) {
@@ -293,9 +333,9 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       exit={{ opacity: 0 }}
       className="min-h-screen bg-gray-50 pb-24 lg:pb-0"
     >
-      {/* Mobile Header - Floating/Sticky */}
-      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 py-3 flex items-center justify-between ${
-        isScrolled ? 'bg-white shadow-sm' : 'bg-transparent'
+      {/* Header - Floating/Sticky */}
+      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between ${
+        isScrolled ? 'bg-white shadow-sm py-3' : 'bg-transparent pt-8 pb-3'
       }`}>
         <button 
           onClick={onBack}
@@ -319,7 +359,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             className={`p-2 rounded-full transition-all flex items-center gap-1.5 ${
               isScrolled 
                 ? (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600 hover:text-red-500') 
-                : (product.isFavorited ? 'bg-red-500 text-white' : 'bg-black/20 backdrop-blur-md text-white hover:text-red-500')
+                : (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-black/20 backdrop-blur-md text-white hover:text-red-500')
             }`}
           >
             <Heart className={`w-5 h-5 ${product.isFavorited ? 'fill-current' : ''}`} />
@@ -330,7 +370,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto lg:px-4 lg:py-6 grid lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto pt-0 lg:pt-6 lg:px-4 grid lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
@@ -496,7 +536,10 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                   </div>
                 </div>
               </div>
-              <button className="text-emerald-600 font-bold text-sm px-4 py-2 bg-emerald-50 rounded-xl">
+              <button 
+                onClick={() => product.seller_id && onViewSellerProfile?.(product.seller_id)}
+                className="text-emerald-600 font-bold text-sm px-4 py-2 bg-emerald-50 rounded-xl active:scale-95 transition-all"
+              >
                 View Profile
               </button>
             </div>
@@ -708,6 +751,14 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
               </div>
             </div>
 
+            <button 
+              onClick={() => product.seller_id && onViewSellerProfile?.(product.seller_id)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-100 transition-all active:scale-95"
+            >
+              <User className="w-4 h-4" />
+              View Seller Profile
+            </button>
+
             <div className="space-y-3">
               {isOwner ? (
                 <>
@@ -728,7 +779,10 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 </>
               ) : (
                 <>
-                  <button className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20">
+                  <button 
+                    onClick={handleContactClick}
+                    className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                  >
                     <Phone className="w-5 h-5" />
                     Show Contact
                   </button>
@@ -773,7 +827,10 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       {/* Mobile Sticky Bottom Actions */}
       {!isOwner && (
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-          <button className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
+          <button 
+            onClick={handleContactClick}
+            className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95"
+          >
             <Phone className="w-5 h-5" />
             Call
           </button>
@@ -806,6 +863,59 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           </button>
         </div>
       )}
+
+      {/* Contact Modal */}
+      <AnimatePresence>
+        {isContactModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl"
+            >
+              <div className="p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-black text-gray-900">Contact Seller</h3>
+                  <button 
+                    onClick={() => setIsContactModalOpen(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 rounded-3xl p-6 flex flex-col items-center gap-4 border border-gray-100">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center">
+                    <Phone className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Phone Number</p>
+                    <p className="text-2xl font-black text-gray-900">{sellerProfile?.phone || 'No phone number'}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  <button 
+                    onClick={handleCall}
+                    className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                  >
+                    <PhoneCall className="w-5 h-5" />
+                    Call Now
+                  </button>
+                  <button 
+                    onClick={handleCopyPhone}
+                    className="w-full bg-white border-2 border-gray-100 text-gray-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:border-emerald-500 hover:text-emerald-500 transition-all active:scale-95"
+                  >
+                    <Copy className="w-5 h-5" />
+                    Copy Number
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Report Modal */}
       {isReporting && (

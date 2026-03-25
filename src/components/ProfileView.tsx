@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
-import { User, Phone, Mail, Camera, Loader2, CheckCircle2, AlertCircle, LogOut, ArrowLeft, Trash2, MapPin } from 'lucide-react';
+import { User, Phone, Mail, Camera, Loader2, CheckCircle2, AlertCircle, LogOut, ArrowLeft, Trash2, MapPin, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api, UserProfile } from '../services/api';
 import { supabase } from '../lib/supabase';
@@ -12,9 +12,10 @@ interface ProfileViewProps {
   onLogout: () => void;
   onLogoutSuccess: () => void;
   onBack: () => void;
+  onAdminClick?: () => void;
 }
 
-export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack }: ProfileViewProps) => {
+export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminClick }: ProfileViewProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -438,6 +439,30 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack }: Profile
             )}
           </button>
         </form>
+
+        {/* Admin Section */}
+        {profile?.role === 'admin' && onAdminClick && (
+          <div className="mt-8 p-8 bg-emerald-50/50 rounded-[2.5rem] border border-emerald-100 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-black text-emerald-900 uppercase tracking-widest">Management</h3>
+            </div>
+            
+            <p className="text-xs text-emerald-600/70 font-bold leading-relaxed">
+              Access the administrative dashboard to manage listings, users, and system reports.
+            </p>
+            
+            <button 
+              onClick={onAdminClick}
+              className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white text-emerald-600 font-black uppercase tracking-widest hover:bg-emerald-50 transition-all active:scale-[0.98] border border-emerald-100 shadow-sm shadow-emerald-500/5"
+            >
+              <ShieldCheck className="w-5 h-5" />
+              Open Admin Panel
+            </button>
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div className="mt-12 mb-20 p-8 bg-red-50/50 rounded-[2.5rem] border border-red-100 space-y-6">
