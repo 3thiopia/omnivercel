@@ -18,6 +18,7 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
     <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 z-[60] flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
       <button 
         onClick={onHome}
+        aria-label="Go to home"
         className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-emerald-500' : 'text-gray-400'}`}
       >
         <Home className="w-6 h-6" />
@@ -26,6 +27,7 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
 
       <button 
         onClick={onItems}
+        aria-label="View items"
         className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'items' ? 'text-emerald-500' : 'text-gray-400'}`}
       >
         <Package className="w-6 h-6" />
@@ -35,6 +37,7 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
       <div className="relative -top-8">
         <button 
           onClick={onSell}
+          aria-label="Post an ad"
           className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-orange-500/40 active:scale-90 transition-transform"
         >
           <PlusCircle className="w-8 h-8" />
@@ -43,6 +46,7 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
 
       <button 
         onClick={onMessages}
+        aria-label="View messages"
         className={`flex flex-col items-center gap-1 transition-colors relative ${activeTab === 'messages' ? 'text-emerald-500' : 'text-gray-400'}`}
       >
         <div className="relative">
@@ -63,6 +67,7 @@ export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, acti
 
       <button 
         onClick={onProfile}
+        aria-label="View profile"
         className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-emerald-500' : 'text-gray-400'}`}
       >
         <div className={`w-6 h-6 rounded-full flex items-center justify-center overflow-hidden border transition-all ${activeTab === 'profile' ? 'border-emerald-500' : 'border-gray-200'}`}>

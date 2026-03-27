@@ -21,6 +21,7 @@ export const Navbar = () => {
             <input
               type="text"
               placeholder="I am looking for..."
+              aria-label="Search listings"
               className="bg-transparent border-none focus:ring-0 w-full text-sm outline-none"
             />
             <div className="h-4 w-[1px] bg-gray-300 mx-2" />
@@ -35,15 +36,24 @@ export const Navbar = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-4">
-            <button className="text-gray-600 hover:text-emerald-500 transition-colors hidden sm:flex items-center gap-1 font-medium">
+            <button 
+              aria-label="Sign in"
+              className="text-gray-600 hover:text-emerald-500 transition-colors hidden sm:flex items-center gap-1 font-medium"
+            >
               <User className="w-5 h-5" />
               <span>Sign In</span>
             </button>
-            <button className="bg-orange-500 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95">
+            <button 
+              aria-label="Post an ad"
+              className="bg-orange-500 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+            >
               <PlusCircle className="w-5 h-5" />
               <span>SELL</span>
             </button>
-            <button className="md:hidden text-gray-600">
+            <button 
+              aria-label="Open menu"
+              className="md:hidden text-gray-600"
+            >
               <Menu className="w-6 h-6" />
             </button>
           </div>

@@ -46,7 +46,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         onClick={onClick}
-        className="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all group cursor-pointer relative"
+        className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 hover:shadow-xl dark:hover:shadow-black/30 transition-all group cursor-pointer relative"
       >
         <div className="relative aspect-[4/3] overflow-hidden">
           <LazyImage 
@@ -64,13 +64,13 @@ export const ListingCard = React.memo(({ title, price, location, image, category
         </div>
         <div className="p-2 sm:p-4">
           {category && (
-            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5 sm:mb-1">
+            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5 sm:mb-1">
               <span>{categoryIcon}</span>
               <span className="truncate">{category}</span>
             </div>
           )}
           <div className="flex justify-between items-start gap-2 mb-1 sm:mb-2">
-            <h3 className="font-bold text-gray-800 text-xs sm:text-base line-clamp-2 group-hover:text-emerald-600 transition-colors leading-tight flex-1">
+            <h3 className="font-bold text-gray-800 dark:text-gray-100 text-xs sm:text-base line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors leading-tight flex-1">
               {title}
             </h3>
             <button 
@@ -78,7 +78,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 e.stopPropagation();
                 onFavorite?.(e);
               }}
-              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 dark:text-gray-600 hover:text-red-500'}`}
             >
               <div className="flex items-center gap-1">
                 {likesCount !== undefined && likesCount > 0 && (
@@ -87,20 +87,20 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
               </div>
               {is_ad && (
-                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
+                <span className="text-[8px] font-black bg-gray-900 dark:bg-black text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
               )}
             </button>
           </div>
           <div className="flex flex-col gap-0.5 sm:gap-1">
-            <span className="text-sm sm:text-xl font-black text-emerald-600">
+            <span className="text-sm sm:text-xl font-black text-emerald-600 dark:text-emerald-400">
               Br {price.toLocaleString()}
             </span>
-            <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-xs mt-0.5">
+            <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 text-[9px] sm:text-xs mt-0.5">
               <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
               <span className="truncate">{location}</span>
             </div>
             {timeAgo && (
-              <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[10px] mt-0.5">
+              <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 text-[8px] sm:text-[10px] mt-0.5">
                 <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
                 <span>{timeAgo}</span>
               </div>
@@ -117,7 +117,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true }}
       onClick={onClick}
-      className="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-md transition-all group cursor-pointer flex h-32"
+      className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 hover:shadow-md dark:hover:shadow-black/20 transition-all group cursor-pointer flex h-32"
     >
       <div className="relative w-32 sm:w-48 overflow-hidden flex-shrink-0">
         <LazyImage 
@@ -136,13 +136,13 @@ export const ListingCard = React.memo(({ title, price, location, image, category
       <div className="p-3 sm:p-4 flex flex-col justify-between flex-1 min-w-0">
         <div>
           {category && (
-            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5 sm:mb-1">
+            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5 sm:mb-1">
               <span>{categoryIcon}</span>
               <span className="truncate">{category}</span>
             </div>
           )}
           <div className="flex justify-between items-start gap-2">
-            <h3 className="font-bold text-gray-800 text-sm sm:text-lg line-clamp-1 group-hover:text-emerald-600 transition-colors flex-1">
+            <h3 className="font-bold text-gray-800 dark:text-gray-100 text-sm sm:text-lg line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors flex-1">
               {title}
             </h3>
             <button 
@@ -150,7 +150,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 e.stopPropagation();
                 onFavorite?.(e);
               }}
-              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 dark:text-gray-600 hover:text-red-500'}`}
             >
               <div className="flex items-center gap-1">
                 {likesCount !== undefined && likesCount > 0 && (
@@ -159,23 +159,23 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
               </div>
               {is_ad && (
-                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
+                <span className="text-[8px] font-black bg-gray-900 dark:bg-black text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
               )}
             </button>
           </div>
-          <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 uppercase font-bold tracking-wider">
+          <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 uppercase font-bold tracking-wider">
             <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
             <span className="truncate">{location}</span>
           </div>
           {timeAgo && (
-            <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[9px] mt-0.5 font-medium">
+            <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 text-[8px] sm:text-[9px] mt-0.5 font-medium">
               <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
               <span>{timeAgo}</span>
             </div>
           )}
         </div>
         <div className="flex justify-between items-end">
-          <span className="text-base sm:text-xl font-black text-emerald-600">
+          <span className="text-base sm:text-xl font-black text-emerald-600 dark:text-emerald-400">
             Br {price.toLocaleString()}
           </span>
         </div>

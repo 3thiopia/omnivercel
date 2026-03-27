@@ -1,7 +1,10 @@
-import { useState, useRef, useEffect, ChangeEvent, FormEvent } from 'react';
+import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle2, Tag, Upload, MapPin, Loader2, GripVertical } from 'lucide-react';
+import { X, CheckCircle2, Tag, Upload, MapPin, Loader2, GripVertical, AlertCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   DndContext,
   closestCenter,
@@ -30,6 +33,18 @@ interface PostAdModalProps {
   onSuccess?: () => void;
   editListing?: Listing | null;
 }
+
+const postAdSchema = z.object({
+  title: z.string().min(5, 'Title must be at least 5 characters').max(100, 'Title too long'),
+  category: z.string().min(1, 'Please select a category'),
+  price: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+    message: 'Price must be a positive number',
+  }),
+  location: z.string().min(1, 'Location is required'),
+  description: z.string().min(20, 'Description must be at least 20 characters').max(2000, 'Description too long'),
+});
+
+type PostAdFormData = z.infer<typeof postAdSchema>;
 
 const SortablePhoto = ({ url, index, onRemove }: { url: string, index: number, onRemove: (index: number) => void }) => {
   const {
@@ -91,30 +106,36 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   const [selectedMainCategory, setSelectedMainCategory] = useState<string>('');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('');
   
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<PostAdFormData>({
+    resolver: zodResolver(postAdSchema),
+    defaultValues: {
+      title: editListing?.title || '',
+      category: editListing?.category_id ? String(editListing.category_id) : '',
+      price: editListing?.price ? String(editListing.price) : '',
+      location: editListing?.location || '',
+      description: editListing?.description || '',
+    },
+  });
+
+  const formData = watch();
+
   const sensors = useSensors(
-    useSensor(MouseSensor, {
+    useSensor(PointerSensor, {
       activationConstraint: {
         distance: 10,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  const [formData, setFormData] = useState({
-    title: editListing?.title || '',
-    category: editListing?.category_id ? String(editListing.category_id) : '',
-    price: editListing?.price ? String(editListing.price) : '',
-    location: editListing?.location || '',
-    description: editListing?.description || '',
-  });
 
   // Reset form when editListing changes or modal opens
   useEffect(() => {
@@ -124,7 +145,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         if (session) {
           const profile = await api.users.getMe(session.access_token);
           if (profile.location) {
-            setFormData(prev => ({ ...prev, location: profile.location || '' }));
+            setValue('location', profile.location || '');
           }
         }
       } catch (err) {
@@ -134,7 +155,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
 
     if (isOpen) {
       if (editListing) {
-        setFormData({
+        reset({
           title: editListing.title,
           category: editListing.category_id ? String(editListing.category_id) : '',
           price: String(editListing.price),
@@ -161,7 +182,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         setPreviews(editListing.images || (editListing.image ? [editListing.image] : []));
         setSelectedFiles([]);
       } else {
-        setFormData({ title: '', category: '', price: '', location: '', description: '' });
+        reset({ title: '', category: '', price: '', location: '', description: '' });
         setSelectedMainCategory('');
         setSelectedSubCategory('');
         setPreviews([]);
@@ -169,13 +190,13 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         fetchUserProfile();
       }
     }
-  }, [isOpen, editListing, categories]);
+  }, [isOpen, editListing, categories, reset, setValue]);
 
   // Update category ID when main or sub category changes
   useEffect(() => {
     const finalCategoryId = selectedSubCategory || selectedMainCategory;
-    setFormData(prev => ({ ...prev, category: finalCategoryId }));
-  }, [selectedMainCategory, selectedSubCategory]);
+    setValue('category', finalCategoryId, { shouldValidate: true });
+  }, [selectedMainCategory, selectedSubCategory, setValue]);
 
   // Fetch categories on open
   useEffect(() => {
@@ -305,18 +326,12 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: PostAdFormData) => {
     setError(null);
     
     // If not editing, require photos
     if (!editListing && selectedFiles.length === 0) {
       setError('Please add at least one photo');
-      return;
-    }
-
-    if (!formData.category) {
-      setError('Please select a category');
       return;
     }
 
@@ -327,7 +342,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
       return;
     }
 
-    const price = Number(formData.price);
+    const price = Number(data.price);
     if (isNaN(price) || price <= 0) {
       toast.error('Please enter a valid price');
       return;
@@ -384,12 +399,12 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
       }
       
       const listingPayload: any = {
-        title: formData.title,
+        title: data.title,
         price: price,
-        location: formData.location,
+        location: data.location,
         image: imageUrls[0], // Primary thumbnail
         images: imageUrls,   // All images for gallery
-        description: formData.description,
+        description: data.description,
         category: categoryName,
         category_id: categoryId,
       };
@@ -408,7 +423,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         // Reset state
         setSuccess(false);
         if (!editListing) {
-          setFormData({ title: '', category: '', price: '', location: '', description: '' });
+          reset({ title: '', category: '', price: '', location: '', description: '' });
           setSelectedFiles([]);
           setPreviews([]);
         }
@@ -463,6 +478,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
             </div>
             <button 
               onClick={onClose}
+              aria-label="Close modal"
               className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all active:scale-95"
             >
               <X className="w-6 h-6 text-gray-500" />
@@ -484,11 +500,21 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
           ) : (
             <>
               {/* Form Content */}
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8">
-                {error && (
-                  <div className="bg-red-50 border border-red-100 text-red-600 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-3">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    {error}
+              <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8">
+                {(error || Object.keys(errors).length > 0) && (
+                  <div className="bg-red-50 border border-red-100 text-red-600 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl text-xs sm:text-sm font-bold flex flex-col gap-2">
+                    {error && (
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="w-4 h-4" />
+                        {error}
+                      </div>
+                    )}
+                    {Object.entries(errors).map(([field, err]) => (
+                      <div key={field} className="flex items-center gap-3">
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="capitalize">{field}:</span> {err?.message as string}
+                      </div>
+                    ))}
                   </div>
                 )}
                 {/* Step 1: Category & Photos */}
@@ -503,8 +529,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                     <div className="relative group">
                       <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                       <select
-                        required
-                        className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm"
+                        className={`w-full pl-12 pr-10 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm ${errors.category ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-emerald-500 focus:bg-white'}`}
                         value={selectedMainCategory}
                         onChange={(e) => {
                           setSelectedMainCategory(e.target.value);
@@ -530,9 +555,8 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                     <div className="relative group">
                       <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                       <select
-                        required
                         disabled={!selectedMainCategory || !categories.some(c => String(c.parent_id) === selectedMainCategory)}
-                        className="w-full pl-12 pr-10 py-4 bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm disabled:opacity-50"
+                        className={`w-full pl-12 pr-10 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm disabled:opacity-50 ${errors.category ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-emerald-500 focus:bg-white'}`}
                         value={selectedSubCategory}
                         onChange={(e) => setSelectedSubCategory(e.target.value)}
                       >
@@ -602,12 +626,14 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                         onChange={handleFileSelect}
                         accept="image/*"
                         multiple
+                        aria-label="Upload photos"
                         className="hidden"
                       />
                       <button 
                         type="button"
                         disabled={previews.length >= 5}
                         onClick={() => fileInputRef.current?.click()}
+                        aria-label="Add photos"
                         className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-emerald-500 hover:text-emerald-500 hover:bg-emerald-50/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Upload className="w-6 h-6" />
@@ -640,28 +666,24 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
 
                   <div className="space-y-4">
                     <div className="relative group">
-                      <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                      <Tag className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${errors.title ? 'text-red-500' : 'text-gray-400 group-focus-within:text-orange-500'}`} />
                       <input
                         type="text"
-                        required
+                        {...register('title')}
                         placeholder="Ad Title (e.g. iPhone 15 Pro Max)"
-                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold text-sm"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        className={`w-full pl-12 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-sm ${errors.title ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                       />
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
                       {/* Price */}
                       <div className="relative group">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 group-focus-within:text-orange-500 transition-colors text-sm">Br</span>
+                        <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black transition-colors text-sm ${errors.price ? 'text-red-500' : 'text-gray-400 group-focus-within:text-orange-500'}`}>Br</span>
                         <input
                           type="number"
-                          required
+                          {...register('price')}
                           placeholder="Price"
-                          className="w-full pl-10 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-2xl outline-none transition-all font-semibold text-sm"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          className={`w-full pl-10 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-sm ${errors.price ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                         />
                       </div>
                     </div>
@@ -675,12 +697,10 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                     </div>
 
                     <textarea
-                      required
+                      {...register('description')}
                       placeholder="Tell buyers more about your item..."
                       rows={4}
-                      className="w-full p-5 bg-gray-50 border-2 border-transparent focus:border-orange-500 focus:bg-white rounded-[2rem] outline-none transition-all font-semibold text-sm resize-none"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className={`w-full p-5 bg-gray-50 border-2 rounded-[2rem] outline-none transition-all font-semibold text-sm resize-none ${errors.description ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                     />
                   </div>
                 </div>

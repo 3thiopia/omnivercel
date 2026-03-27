@@ -75,6 +75,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
   const [reportSearchQuery, setReportSearchQuery] = useState('');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [listingSearchQuery, setListingSearchQuery] = useState('');
+  const [listingCategoryFilter, setListingCategoryFilter] = useState('all');
+  const [listingStatusFilter, setListingStatusFilter] = useState('all');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [adSearchQuery, setAdSearchQuery] = useState('');
+  const [adCategoryFilter, setAdCategoryFilter] = useState('all');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -100,12 +105,17 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
     }
     if (activeTab === 'listings') {
       fetchListings();
+      fetchCategories();
     }
     if (activeTab === 'reports') {
       fetchReports();
     }
     if (activeTab === 'users') {
       fetchUsers();
+    }
+    if (activeTab === 'ads') {
+      fetchListings();
+      fetchCategories();
     }
   }, [activeTab]);
 
@@ -400,6 +410,23 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
   const handleMarkAsSold = async (id: string | number) => {
     handleUpdateStatus(id, 'sold');
   };
+
+  const filteredListings = localListings.filter(l => {
+    const matchesSearch = l.title.toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
+                         l.id.toString().includes(listingSearchQuery) ||
+                         l.location.toLowerCase().includes(listingSearchQuery.toLowerCase());
+    const matchesCategory = listingCategoryFilter === 'all' || l.category_id === listingCategoryFilter || l.category_data?.name === listingCategoryFilter;
+    const matchesStatus = listingStatusFilter === 'all' || l.status === listingStatusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  const filteredAdsListings = localListings.filter(l => {
+    const isAvailable = !l.is_ad && l.status === 'active';
+    const matchesSearch = l.title.toLowerCase().includes(adSearchQuery.toLowerCase()) ||
+                         l.id.toString().includes(adSearchQuery);
+    const matchesCategory = adCategoryFilter === 'all' || l.category_id === adCategoryFilter || l.category_data?.name === adCategoryFilter;
+    return isAvailable && matchesSearch && matchesCategory;
+  });
 
   const SidebarContent = () => (
     <>
@@ -755,17 +782,26 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                       className="w-full bg-white border border-gray-200 rounded-xl pl-11 pr-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
                     />
                   </div>
-                  <select className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all flex-shrink-0">
-                    <option>All Categories</option>
-                    <option>Electronics</option>
-                    <option>Vehicles</option>
-                    <option>Property</option>
+                  <select 
+                    value={listingCategoryFilter}
+                    onChange={(e) => setListingCategoryFilter(e.target.value)}
+                    className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all flex-shrink-0"
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                   </select>
-                  <select className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all flex-shrink-0">
-                    <option>All Status</option>
-                    <option>Approved</option>
-                    <option>Pending</option>
-                    <option>Rejected</option>
+                  <select 
+                    value={listingStatusFilter}
+                    onChange={(e) => setListingStatusFilter(e.target.value)}
+                    className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all flex-shrink-0"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="sold">Sold</option>
+                    <option value="hidden">Unlisted</option>
                   </select>
                 </div>
               </div>
@@ -773,13 +809,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
               <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
                 {/* Mobile Card View */}
                 <div className="lg:hidden divide-y divide-gray-100">
-                  {localListings
-                    .filter(l => 
-                      l.title.toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
-                      l.id.toString().includes(listingSearchQuery) ||
-                      l.location.toLowerCase().includes(listingSearchQuery.toLowerCase())
-                    )
-                    .map((listing) => (
+                  {filteredListings.map((listing) => (
                     <div key={listing.id} className="p-4 space-y-4">
                       <div className="flex items-center gap-3">
                         <img src={listing.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
@@ -793,6 +823,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                               {listing.status === 'sold' && (
                                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-red-50 text-red-600">
                                   Sold
+                                </span>
+                              )}
+                              {listing.status === 'hidden' && (
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-orange-50 text-orange-600">
+                                  Unlisted
                                 </span>
                               )}
                             </div>
@@ -819,6 +854,14 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                             className="px-3 py-1.5 text-orange-600 hover:bg-orange-50 rounded-lg text-[10px] font-bold uppercase transition-all"
                           >
                             Unlist
+                          </button>
+                        )}
+                        {listing.status === 'hidden' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(listing.id, 'active')}
+                            className="px-3 py-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg text-[10px] font-bold uppercase transition-all"
+                          >
+                            List Back
                           </button>
                         )}
                         <button 
@@ -873,13 +916,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {localListings
-                        .filter(l => 
-                          l.title.toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
-                          l.id.toString().includes(listingSearchQuery) ||
-                          l.location.toLowerCase().includes(listingSearchQuery.toLowerCase())
-                        )
-                        .map((listing) => (
+                      {filteredListings.map((listing) => (
                         <tr key={listing.id} className="hover:bg-gray-50/50 transition-colors group">
                           <td className="px-6 py-4 text-xs font-mono text-gray-400">#{listing.id}</td>
                           <td className="px-6 py-4">
@@ -916,6 +953,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                                   Pending
                                 </span>
                               )}
+                              {listing.status === 'hidden' && (
+                                <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-black uppercase bg-orange-50 text-orange-600 border border-orange-100">
+                                  Unlisted
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -936,6 +978,15 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                                   title="Unlist"
                                 >
                                   <XCircle className="w-5 h-5" />
+                                </button>
+                              )}
+                              {listing.status === 'hidden' && (
+                                <button 
+                                  onClick={() => handleUpdateStatus(listing.id, 'active')}
+                                  className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                  title="List Back"
+                                >
+                                  <CheckCircle2 className="w-5 h-5" />
                                 </button>
                               )}
                               <button 
@@ -1712,7 +1763,17 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
             >
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <h2 className="text-2xl lg:text-3xl font-black text-gray-900">User Management</h2>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 sm:flex-none sm:min-w-[240px]">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search users..." 
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-11 pr-4 py-2 text-sm font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    />
+                  </div>
                   <button 
                     onClick={fetchUsers}
                     className="bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
@@ -1736,7 +1797,13 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                   <>
                     {/* Mobile User Cards */}
                     <div className="lg:hidden divide-y divide-gray-50">
-                      {users.map((user) => (
+                      {users
+                        .filter(u => 
+                          u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                          u.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                          u.id.toString().includes(userSearchQuery)
+                        )
+                        .map((user) => (
                         <div key={user.id} className="p-4 space-y-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -1807,7 +1874,13 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {users.map((user) => (
+                          {users
+                            .filter(u => 
+                              u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                              u.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                              u.id.toString().includes(userSearchQuery)
+                            )
+                            .map((user) => (
                             <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
@@ -1939,13 +2012,35 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
 
               {/* Promote New Listing */}
               <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
+                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <h3 className="text-lg font-bold text-gray-900">Promote New Listing</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Search listings..." 
+                        value={adSearchQuery}
+                        onChange={(e) => setAdSearchQuery(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-1.5 text-xs font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                      />
+                    </div>
+                    <select 
+                      value={adCategoryFilter}
+                      onChange={(e) => setAdCategoryFilter(e.target.value)}
+                      className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-600 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    >
+                      <option value="all">All Categories</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="bg-white">
                   {/* Mobile Listing Cards for Ads */}
                   <div className="lg:hidden divide-y divide-gray-50">
-                    {localListings.filter(l => !l.is_ad && l.status === 'active').slice(0, 10).map(listing => (
+                    {filteredAdsListings.slice(0, 10).map(listing => (
                       <div key={listing.id} className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
                           <img src={listing.image} alt="" className="w-12 h-12 rounded-xl object-cover shadow-sm" />
@@ -1979,7 +2074,7 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {localListings.filter(l => !l.is_ad && l.status === 'active').slice(0, 10).map(listing => (
+                        {filteredAdsListings.slice(0, 10).map(listing => (
                           <tr key={listing.id} className="hover:bg-gray-50/50 transition-colors group">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">

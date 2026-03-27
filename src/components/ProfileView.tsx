@@ -1,6 +1,9 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { User, Phone, Mail, Camera, Loader2, CheckCircle2, AlertCircle, LogOut, ArrowLeft, Trash2, MapPin, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { api, UserProfile } from '../services/api';
 import { supabase } from '../lib/supabase';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
@@ -15,6 +18,15 @@ interface ProfileViewProps {
   onAdminClick?: () => void;
 }
 
+const profileSchema = z.object({
+  fullName: z.string().min(2, 'Full name must be at least 2 characters').max(50, 'Full name too long'),
+  phone: z.string().regex(/^\+?[0-9]{10,15}$/, 'Invalid phone number format').optional().or(z.literal('')),
+  region: z.string().min(1, 'Region is required'),
+  subRegion: z.string().min(1, 'Sub-region is required'),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
+
 export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminClick }: ProfileViewProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,11 +34,19 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Form state
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedSubRegion, setSelectedSubRegion] = useState('');
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+  });
+
+  const formData = watch();
+
   const [avatarUrl, setAvatarUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -57,20 +77,25 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
 
       const data = await api.users.getMe(session.access_token);
       setProfile(data);
-      setFullName(data.full_name || '');
-      setPhone(data.phone || '');
       setAvatarUrl(data.avatar_url || '');
       
+      let region = '';
+      let subRegion = '';
+
       if (data.location) {
         if (data.location.includes(', ')) {
-          const [region, subRegion] = data.location.split(', ');
-          setSelectedRegion(region);
-          setSelectedSubRegion(subRegion);
+          [region, subRegion] = data.location.split(', ');
         } else {
-          setSelectedRegion(data.location);
-          setSelectedSubRegion('');
+          region = data.location;
         }
       }
+
+      reset({
+        fullName: data.full_name || '',
+        phone: data.phone || '',
+        region: region,
+        subRegion: subRegion,
+      });
     } catch (err) {
       console.error('Error fetching profile:', err);
       setError('Failed to load profile. Please try again.');
@@ -114,8 +139,7 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
     }
   };
 
-  const handleUpdateProfile = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleUpdateProfile = async (data: ProfileFormData) => {
     setIsSaving(true);
     setError(null);
     setSuccess(false);
@@ -124,13 +148,13 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Unauthorized');
 
-      const locationString = selectedSubRegion 
-        ? `${selectedRegion}, ${selectedSubRegion}` 
-        : selectedRegion;
+      const locationString = data.subRegion 
+        ? `${data.region}, ${data.subRegion}` 
+        : data.region;
 
       const updatedProfile = await api.users.updateMe({
-        full_name: fullName,
-        phone: phone,
+        full_name: data.fullName,
+        phone: data.phone,
         location: locationString
       }, session.access_token);
 
@@ -264,21 +288,31 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
               />
             </label>
           </div>
-          <h2 className="mt-4 text-2xl font-black text-white tracking-tight">{fullName || 'Your Name'}</h2>
+          <h2 className="mt-4 text-2xl font-black text-white tracking-tight">{formData.fullName || 'Your Name'}</h2>
           <p className="text-emerald-100 text-sm font-medium">{profile?.email}</p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 -mt-10 relative z-10">
-        <form onSubmit={handleUpdateProfile} className="space-y-6">
-          {error && (
+        <form onSubmit={handleSubmit(handleUpdateProfile)} className="space-y-6">
+          {(error || Object.keys(errors).length > 0) && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 text-red-600 p-4 rounded-3xl flex items-center gap-3 text-sm font-bold border border-red-100"
+              className="bg-red-50 text-red-600 p-4 rounded-3xl flex flex-col gap-2 text-sm font-bold border border-red-100"
             >
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              {error}
+              {error && (
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  {error}
+                </div>
+              )}
+              {Object.entries(errors).map(([field, err]) => (
+                <div key={field} className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span className="capitalize">{field}:</span> {err?.message as string}
+                </div>
+              ))}
             </motion.div>
           )}
 
@@ -306,14 +340,12 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
                 <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                  <User className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${errors.fullName ? 'text-red-500' : 'text-gray-400 group-focus-within:text-emerald-500'}`} />
                   <input 
                     type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    {...register('fullName')}
                     placeholder="Enter your full name"
-                    className="w-full bg-gray-50 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                    required
+                    className={`w-full bg-gray-50 border-2 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all ${errors.fullName ? 'border-red-500 bg-red-50' : 'border-transparent'}`}
                   />
                 </div>
               </div>
@@ -321,13 +353,12 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
                 <div className="relative group">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                  <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${errors.phone ? 'text-red-500' : 'text-gray-400 group-focus-within:text-emerald-500'}`} />
                   <input 
                     type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    {...register('phone')}
                     placeholder="Enter your phone number"
-                    className="w-full bg-gray-50 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                    className={`w-full bg-gray-50 border-2 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all ${errors.phone ? 'border-red-500 bg-red-50' : 'border-transparent'}`}
                   />
                 </div>
               </div>
@@ -347,14 +378,13 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Region</label>
                 <div className="relative group">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                  <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${errors.region ? 'text-red-500' : 'text-gray-400 group-focus-within:text-emerald-500'}`} />
                   <select
-                    required
-                    className="w-full pl-12 pr-10 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none cursor-pointer"
-                    value={selectedRegion}
+                    className={`w-full pl-12 pr-10 py-4 bg-gray-50 border-2 rounded-2xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none cursor-pointer ${errors.region ? 'border-red-500 bg-red-50' : 'border-transparent'}`}
+                    value={formData.region}
                     onChange={(e) => {
-                      setSelectedRegion(e.target.value);
-                      setSelectedSubRegion('');
+                      setValue('region', e.target.value, { shouldValidate: true });
+                      setValue('subRegion', '', { shouldValidate: true });
                     }}
                   >
                     <option value="">Select Region</option>
@@ -372,19 +402,18 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
                 </div>
               </div>
 
-              {selectedRegion && ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions && (
+              {formData.region && ETHIOPIAN_LOCATIONS.find(l => l.name === formData.region)?.subRegions && (
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sub-Region / City</label>
                   <div className="relative group">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                    <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${errors.subRegion ? 'text-red-500' : 'text-gray-400 group-focus-within:text-emerald-500'}`} />
                     <select
-                      required
-                      className="w-full pl-12 pr-10 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none cursor-pointer"
-                      value={selectedSubRegion}
-                      onChange={(e) => setSelectedSubRegion(e.target.value)}
+                      className={`w-full pl-12 pr-10 py-4 bg-gray-50 border-2 rounded-2xl text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none cursor-pointer ${errors.subRegion ? 'border-red-500 bg-red-50' : 'border-transparent'}`}
+                      value={formData.subRegion}
+                      onChange={(e) => setValue('subRegion', e.target.value, { shouldValidate: true })}
                     >
                       <option value="">Select Sub-Region / City</option>
-                      {ETHIOPIAN_LOCATIONS.find(l => l.name === selectedRegion)?.subRegions?.map((sub) => (
+                      {ETHIOPIAN_LOCATIONS.find(l => l.name === formData.region)?.subRegions?.map((sub) => (
                         <option key={sub} value={sub}>
                           {sub}
                         </option>

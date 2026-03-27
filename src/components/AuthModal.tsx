@@ -13,6 +13,7 @@ interface AuthModalProps {
 
 export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [authMethod, setAuthMethod] = useState<'password' | 'magic_link'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -47,11 +48,23 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        if (authMethod === 'magic_link') {
+          const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+              emailRedirectTo: window.location.origin,
+            },
+          });
+          if (error) throw error;
+          setShowVerificationInfo(true);
+          return;
+        } else {
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) throw error;
+        }
       } else {
         const locationString = selectedSubRegion 
           ? `${selectedRegion}, ${selectedSubRegion}` 
@@ -109,14 +122,20 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                 <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-4">
                   <Mail className="w-10 h-10" />
                 </div>
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Verify Your Email</h2>
+                <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                  {authMethod === 'magic_link' ? 'Check Your Email' : 'Verify Your Email'}
+                </h2>
                 <p className="text-gray-500 font-medium leading-relaxed">
-                  We've sent a verification link to <span className="text-emerald-600 font-bold">{email}</span>. 
-                  Please check your inbox and click the link to activate your account.
+                  {authMethod === 'magic_link' 
+                    ? <>We've sent a magic link to <span className="text-emerald-600 font-bold">{email}</span>. Click the link in the email to log in instantly.</>
+                    : <>We've sent a verification link to <span className="text-emerald-600 font-bold">{email}</span>. Please check your inbox and click the link to activate your account.</>
+                  }
                 </p>
-                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-amber-700 text-sm font-medium">
-                  Note: You won't be able to log in until your email is verified.
-                </div>
+                {!isLogin && (
+                  <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-amber-700 text-sm font-medium">
+                    Note: You won't be able to log in until your email is verified.
+                  </div>
+                )}
                 <button
                   onClick={handleClose}
                   className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 transition-all"
@@ -263,20 +282,45 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
-                    <div className="relative group">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                      <input
-                        type="password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-sm"
-                        placeholder="••••••••"
-                      />
+                  {isLogin && (
+                    <div className="flex bg-gray-50 p-1 rounded-2xl mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setAuthMethod('password')}
+                        className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+                          authMethod === 'password' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuthMethod('magic_link')}
+                        className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
+                          authMethod === 'magic_link' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        Magic Link
+                      </button>
                     </div>
-                  </div>
+                  )}
+
+                  {(!isLogin || authMethod === 'password') && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                      <div className="relative group">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                        <input
+                          type="password"
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-sm"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
@@ -287,8 +331,16 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                       <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
-                        {isLogin ? <LogIn className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
-                        <span>{isLogin ? 'Log In' : 'Create Account'}</span>
+                        {isLogin ? (
+                          authMethod === 'magic_link' ? <Mail className="w-5 h-5" /> : <LogIn className="w-5 h-5" />
+                        ) : (
+                          <UserPlus className="w-5 h-5" />
+                        )}
+                        <span>
+                          {isLogin 
+                            ? (authMethod === 'magic_link' ? 'Send Magic Link' : 'Log In') 
+                            : 'Create Account'}
+                        </span>
                       </>
                     )}
                   </button>
