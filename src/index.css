@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --dark-mode: class;
+}
+
+:root {
+  color-scheme: light;
+}
+
 @layer base {
   /* Hide scrollbar for Chrome, Safari and Opera */
   ::-webkit-scrollbar {
