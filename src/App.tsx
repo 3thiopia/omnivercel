@@ -815,7 +815,7 @@ export default function App() {
                         <select 
                           value={sortBy}
                           onChange={(e) => setSortBy(e.target.value as any)}
-                          className="w-full appearance-none bg-white border border-gray-100 rounded-xl sm:rounded-2xl pl-4 sm:pl-5 pr-8 sm:pr-10 py-2 sm:py-3.5 text-[11px] sm:text-sm font-black text-gray-900 shadow-sm hover:border-emerald-500 transition-all cursor-pointer outline-none focus:ring-4 focus:ring-emerald-500/10"
+                          className="w-full appearance-none bg-white border border-gray-100/50 rounded-xl sm:rounded-2xl pl-4 sm:pl-5 pr-8 sm:pr-10 py-2 sm:py-3.5 text-[11px] sm:text-sm font-black text-gray-900 shadow-sm hover:border-emerald-500 transition-all cursor-pointer outline-none focus:ring-4 focus:ring-emerald-500/10"
                         >
                           <option value="created_at">Recent</option>
                           <option value="price">Price</option>
@@ -843,7 +843,7 @@ export default function App() {
                       <div className="hidden sm:block h-8 w-px bg-gray-100" />
                       <div className="flex items-center gap-2 sm:gap-3">
                         <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] hidden sm:block">Display</p>
-                        <div className="flex items-center bg-gray-50/50 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-inner">
+                        <div className="flex items-center bg-gray-50/50 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-gray-100/50 shadow-inner">
                           <button 
                             onClick={() => setViewMode('list')}
                             className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-300 ${viewMode === 'list' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-600'}`}
@@ -901,7 +901,7 @@ export default function App() {
                 </section>
 
                 {/* Why Omni Section */}
-                <section className="px-4 py-16 bg-white rounded-[3rem] my-12 mx-4 border border-gray-100">
+                <section className="px-4 py-16 bg-white rounded-[3rem] my-12 mx-4 border border-gray-100/50 shadow-sm">
                   <div className="text-center max-w-3xl mx-auto mb-16">
                     <h2 className="text-4xl font-black text-gray-900 mb-4">Why Choose OmniMarket?</h2>
                     <p className="text-gray-500 text-lg">We make buying and selling safe, fast and easy for everyone.</p>
