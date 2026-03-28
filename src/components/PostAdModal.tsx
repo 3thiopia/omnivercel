@@ -42,8 +42,8 @@ const postAdSchema = z.object({
   }),
   location: z.string().min(1, 'Location is required'),
   description: z.string().min(20, 'Description must be at least 20 characters').max(2000, 'Description too long'),
-  condition: z.enum(['Brand New', 'Slightly Used', 'Used'], {
-    required_error: 'Please select item condition',
+  condition: z.enum(['Brand New', 'Slightly Used', 'Used'] as const, {
+    error: 'Please select item condition',
   }),
 });
 

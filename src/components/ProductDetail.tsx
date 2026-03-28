@@ -107,26 +107,52 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     const fetchRelated = async () => {
       setIsLoadingRelated(true);
       try {
-        // Fetch items from same category
+        const keywords = product.title
+          .toLowerCase()
+          .replace(/[^\w\s]/g, '')
+          .split(' ')
+          .filter(word => word.length > 3 && !['sale', 'ethiopia', 'addis', 'ababa', 'brand', 'new', 'used', 'slightly'].includes(word))
+          .slice(0, 2)
+          .join(' ');
+
+        // 1. Fetch items from same category with name match (High Relevance)
+        let nameMatchItems: Listing[] = [];
+        if (keywords) {
+          nameMatchItems = await api.listings.getAll({ 
+            category: product.category_id || product.category,
+            search: keywords,
+            status: 'active',
+            limit: 10
+          });
+        }
+
+        // 2. Fetch general items from same category
         const categoryItems = await api.listings.getAll({ 
           category: product.category_id || product.category,
-          status: 'active'
+          status: 'active',
+          limit: 20
         });
         
-        // Fetch items from same seller
+        // 3. Fetch items from same seller
         let sellerItems: Listing[] = [];
         if (product.seller_id) {
           sellerItems = await api.listings.getAll({
             seller_id: product.seller_id as string,
-            status: 'active'
+            status: 'active',
+            limit: 10
           });
         }
         
-        // Combine and remove duplicates
-        const combined = [...categoryItems, ...sellerItems];
+        // Combine and rank: 
+        // 1. Name matches (excluding current)
+        // 2. Seller items (excluding current)
+        // 3. Category items (excluding current)
+        const combined = [...nameMatchItems, ...sellerItems, ...categoryItems];
         const unique = combined.reduce((acc: Listing[], current) => {
-          const x = acc.find(item => item.id === current.id);
-          if (!x && String(current.id) !== String(product.id)) {
+          const isDuplicate = acc.find(item => item.id === current.id);
+          const isCurrentProduct = String(current.id) === String(product.id);
+          
+          if (!isDuplicate && !isCurrentProduct) {
             return acc.concat([current]);
           } else {
             return acc;
@@ -1079,7 +1105,11 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       <div className="max-w-7xl mx-auto px-4 py-12 border-t border-gray-100 mt-12">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Related Products</h2>
+            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+              {relatedItems.some(item => item.title.toLowerCase().includes(product.title.split(' ')[0].toLowerCase())) 
+                ? `More like this ${product.title.split(' ')[0]}` 
+                : 'Related Products'}
+            </h2>
             <p className="text-gray-500 font-medium">Similar items in {product.category_data?.name || product.category}</p>
           </div>
           {relatedItems.length > 10 && !showAllRelated && (

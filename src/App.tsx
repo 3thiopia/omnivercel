@@ -11,7 +11,7 @@ import { api, Listing, UserProfile } from './services/api';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETHIOPIAN_LOCATIONS } from './constants/locations';
-import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2, RefreshCw, CheckCircle2, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { getOptimizedImageUrl } from './lib/imageUtils';
 import { ProfileCompletionModal } from './components/ProfileCompletionModal';
@@ -669,6 +669,18 @@ export default function App() {
                       placeholder="Search for anything..."
                       className="bg-transparent border-none focus:ring-0 w-full text-sm sm:text-base outline-none font-medium placeholder:text-gray-400"
                     />
+                    {searchQuery && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setTimeout(() => refetchListings(), 0);
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                     <button 
                       type="submit"
                       className="bg-emerald-500 text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold hover:bg-emerald-600 transition-all active:scale-95 shrink-0 text-xs sm:text-base shadow-lg shadow-emerald-500/20"
@@ -684,6 +696,60 @@ export default function App() {
                       <span className="text-xs sm:text-sm font-bold">Filters</span>
                     </button>
                   </motion.form>
+
+                  {/* Active Filters & Clear All */}
+                  {(searchQuery || selectedCategory || minPrice || maxPrice || regionFilter || subRegionFilter) && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex flex-wrap items-center gap-2 mt-3"
+                    >
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Active Filters:</span>
+                      
+                      {searchQuery && (
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-emerald-100">
+                          Search: {searchQuery}
+                        </span>
+                      )}
+                      
+                      {selectedCategory && (
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-emerald-100">
+                          Category Active
+                        </span>
+                      )}
+
+                      {(minPrice || maxPrice) && (
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-emerald-100">
+                          Price: {minPrice || '0'} - {maxPrice || '∞'}
+                        </span>
+                      )}
+
+                      {regionFilter && (
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-emerald-100">
+                          {regionFilter}{subRegionFilter ? ` > ${subRegionFilter}` : ''}
+                        </span>
+                      )}
+
+                      <button 
+                        onClick={() => {
+                          setSearchQuery('');
+                          setMinPrice('');
+                          setMaxPrice('');
+                          setLocationFilter('');
+                          setRegionFilter('');
+                          setSubRegionFilter('');
+                          setSelectedCategory(null);
+                          setSortBy('created_at');
+                          setSortOrder('desc');
+                          setTimeout(() => refetchListings(), 0);
+                        }}
+                        className="bg-gray-900 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-gray-800 transition-all flex items-center gap-1.5 shadow-lg shadow-gray-900/10 active:scale-95"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Clear All
+                      </button>
+                    </motion.div>
+                  )}
 
                   {/* Filter Pane */}
                   <AnimatePresence>
