@@ -217,7 +217,8 @@ export const api = {
         .select(`
           *,
           category_data:categories(name, icon),
-          profiles(full_name)
+          profiles(full_name),
+          listing_images(image_url)
         `);
 
       // 1. Status Filter
@@ -303,6 +304,7 @@ export const api = {
       const mappedData = (data || []).map((item: any) => ({
         ...item,
         image: getOptimizedImageUrl(item.thumbnail_url, { width: 800, height: 600 }),
+        images: item.listing_images?.map((img: any) => getOptimizedImageUrl(img.image_url, { width: 800, height: 600 })),
         sellerName: item.profiles?.full_name,
         category: item.category_data?.name,
         categoryIcon: item.category_data?.icon,
@@ -495,7 +497,8 @@ export const api = {
           listing:listings(
             *,
             category_data:categories(name, icon),
-            profiles(full_name)
+            profiles(full_name),
+            listing_images(image_url)
           )
         `)
         .eq('user_id', session.user.id);
@@ -505,6 +508,7 @@ export const api = {
       return (data as any[]).map(f => ({
         ...f.listing,
         image: getOptimizedImageUrl(f.listing.thumbnail_url, { width: 800, height: 600 }),
+        images: f.listing.listing_images?.map((img: any) => getOptimizedImageUrl(img.image_url, { width: 800, height: 600 })),
         sellerName: f.listing.profiles?.full_name,
         category: f.listing.category_data?.name,
         categoryIcon: f.listing.category_data?.icon,

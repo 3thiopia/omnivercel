@@ -32,7 +32,7 @@ const ChatView = lazy(() => import('./components/ChatView').then(m => ({ default
 const StaticPage = lazy(() => import('./components/StaticPage').then(m => ({ default: m.StaticPage })));
 const SellerProfileView = lazy(() => import('./components/SellerProfileView').then(m => ({ default: m.SellerProfileView })));
 
-function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, setIsPostAdOpen, handleDeleteListing, handleToggleFavorite, handleViewSellerProfile }: any) {
+function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, setIsPostAdOpen, handleDeleteListing, handleUpdateListingStatus, handleToggleFavorite, handleViewSellerProfile, setIsAuthOpen }: any) {
   const { id, slug } = useParams();
   const navigate = useNavigate();
   const [listing, setListing] = useState<Listing | null>(null);
@@ -84,11 +84,18 @@ function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, s
       onBack={() => navigate(-1)}
       onViewProduct={(l) => onOpenListing(l)}
       onStartChat={onStartChat}
+      onAuthRequired={() => setIsAuthOpen(true)}
       onEdit={() => {
         setEditingListing(listing);
         setIsPostAdOpen(true);
       }}
       onDelete={() => handleDeleteListing(listing.id)}
+      onUpdateStatus={async (id, status) => {
+        const success = await handleUpdateListingStatus(id, status);
+        if (success) {
+          setListing({ ...listing, status });
+        }
+      }}
       onFavorite={async () => {
         const favorited = await handleToggleFavorite(listing.id);
         if (favorited !== null) {
@@ -393,6 +400,22 @@ export default function App() {
     setIsDeletingListing(listingId);
   };
 
+  const handleUpdateListingStatus = async (id: string | number, status: Listing['status']) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return false;
+
+      await api.listings.update(id.toString(), { status }, session.access_token);
+      toast.success(`Listing marked as ${status}`);
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
+      return true;
+    } catch (err) {
+      console.error('Error updating listing status:', err);
+      toast.error('Failed to update listing status');
+      return false;
+    }
+  };
+
   const confirmDeleteListing = async () => {
     if (!isDeletingListing) return;
     
@@ -501,6 +524,7 @@ export default function App() {
 
   const isFullScreenPage = location.pathname.startsWith('/admin') || 
                          location.pathname.startsWith('/listing/') || 
+                         location.pathname.startsWith('/product/') || 
                          location.pathname.startsWith('/seller/');
 
   return (
@@ -1116,8 +1140,10 @@ export default function App() {
                 setEditingListing={setEditingListing}
                 setIsPostAdOpen={setIsPostAdOpen}
                 handleDeleteListing={handleDeleteListing}
+                handleUpdateListingStatus={handleUpdateListingStatus}
                 handleToggleFavorite={handleToggleFavorite}
                 handleViewSellerProfile={handleViewSellerProfile}
+                setIsAuthOpen={setIsAuthOpen}
               />
             } />
             <Route path="/product/:slug" element={
@@ -1127,8 +1153,10 @@ export default function App() {
                 setEditingListing={setEditingListing}
                 setIsPostAdOpen={setIsPostAdOpen}
                 handleDeleteListing={handleDeleteListing}
+                handleUpdateListingStatus={handleUpdateListingStatus}
                 handleToggleFavorite={handleToggleFavorite}
                 handleViewSellerProfile={handleViewSellerProfile}
+                setIsAuthOpen={setIsAuthOpen}
               />
             } />
             <Route path="/seller/:id" element={<SellerProfileWrapper handleOpenListing={handleOpenListing} handleStartChat={handleStartChat} />} />

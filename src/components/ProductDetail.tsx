@@ -47,10 +47,12 @@ interface ProductDetailProps {
   onEdit?: (listing: Listing) => void;
   onDelete?: (listingId: string | number) => void;
   onFavorite?: (listingId: string | number) => void;
+  onUpdateStatus?: (listingId: string | number, status: Listing['status']) => void;
   onViewSellerProfile?: (sellerId: string) => void;
+  onAuthRequired?: () => void;
 }
 
-export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onEdit, onDelete, onFavorite, onViewSellerProfile }: ProductDetailProps) => {
+export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onEdit, onDelete, onFavorite, onUpdateStatus, onViewSellerProfile, onAuthRequired }: ProductDetailProps) => {
   const [activeImage, setActiveImage] = useState(product.image);
   const [relatedItems, setRelatedItems] = useState<Listing[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
@@ -88,9 +90,15 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
   }, []);
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user || null);
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUser(session?.user || null);
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const isOwner = currentUser?.id === product.seller_id;
@@ -208,14 +216,27 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     setShowAllRelated(false);
   }, [product.id]);
 
+  const handleStatusUpdate = async (status: Listing['status']) => {
+    if (!onUpdateStatus || isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    try {
+      await onUpdateStatus(product.id, status);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const displayedRelated = showAllRelated ? relatedItems : relatedItems.slice(0, 10);
 
   const handleStartChat = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        // Handle unauthenticated user - maybe show login modal?
-        toast.error('Please log in to start a chat.');
+        if (onAuthRequired) {
+          onAuthRequired();
+        } else {
+          toast.error('Please log in to start a chat.');
+        }
         return;
       }
 
@@ -257,6 +278,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const handleCopyPhone = () => {
     if (sellerProfile?.phone) {
@@ -597,8 +619,47 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 </div>
               </div>
 
-              <div className="text-4xl font-black text-emerald-600 pt-2">
-                Br{product.price.toLocaleString()}
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-4xl font-black text-emerald-600">
+                  Br{product.price.toLocaleString()}
+                </div>
+                <div className="hidden lg:flex gap-3">
+                  {isOwner ? (
+                    <>
+                      <button 
+                        onClick={() => onEdit?.(product)}
+                        className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                      >
+                        <Edit3 className="w-5 h-5" />
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => onDelete?.(product?.id || '')}
+                        className="bg-red-50 text-red-500 border-2 border-red-500 px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-all"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        Delete
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={handleContactClick}
+                        className="bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                      >
+                        <PhoneCall className="w-5 h-5" />
+                        Call
+                      </button>
+                      <button 
+                        onClick={handleStartChat}
+                        className="bg-white border-2 border-emerald-500 text-emerald-500 px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all"
+                      >
+                        <MessageCircle className="w-5 h-5" />
+                        Chat
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -668,6 +729,26 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 View Profile
               </button>
             </div>
+
+            {/* Mobile Inline Actions */}
+            {!isOwner && (
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={handleContactClick}
+                  className="flex-1 bg-emerald-500 text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95"
+                >
+                  <PhoneCall className="w-5 h-5" />
+                  Call
+                </button>
+                <button 
+                  onClick={handleStartChat}
+                  className="flex-1 bg-white border-2 border-emerald-500 text-emerald-500 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Chat
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Safety Tips */}
@@ -887,20 +968,72 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             <div className="space-y-3">
               {isOwner ? (
                 <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => onEdit?.(product)}
+                      className="bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                      <Edit3 className="w-5 h-5" />
+                      Edit Listing
+                    </button>
+                    <button 
+                      onClick={() => onDelete?.(product?.id || '')}
+                      className="bg-red-50 text-red-500 border-2 border-red-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-all"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      Delete
+                    </button>
+                  </div>
+
                   <button 
-                    onClick={() => onEdit?.(product)}
-                    className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                    onClick={() => toast.success('Promotion feature coming soon!')}
+                    className="w-full bg-orange-100 text-orange-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-200 transition-all"
                   >
-                    <Edit3 className="w-5 h-5" />
-                    Edit Listing
+                    <Cpu className="w-5 h-5" />
+                    Promote Listing
                   </button>
-                  <button 
-                    onClick={() => onDelete?.(product?.id || '')}
-                    className="w-full bg-red-50 text-red-500 border-2 border-red-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-all"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                    Delete Listing
-                  </button>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {product.status === 'active' ? (
+                      <button 
+                        onClick={() => handleStatusUpdate('sold')}
+                        disabled={isUpdatingStatus}
+                        className="bg-white border-2 border-emerald-500 text-emerald-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                        Mark Sold
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleStatusUpdate('active')}
+                        disabled={isUpdatingStatus}
+                        className="bg-white border-2 border-emerald-500 text-emerald-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-5 h-5" />
+                        Relist Item
+                      </button>
+                    )}
+
+                    {product.status === 'hidden' ? (
+                      <button 
+                        onClick={() => handleStatusUpdate('active')}
+                        disabled={isUpdatingStatus}
+                        className="bg-white border-2 border-gray-200 text-gray-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:border-emerald-500 hover:text-emerald-500 transition-all disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-5 h-5" />
+                        List Back
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleStatusUpdate('hidden')}
+                        disabled={isUpdatingStatus}
+                        className="bg-white border-2 border-gray-200 text-gray-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:border-orange-500 hover:text-orange-500 transition-all disabled:opacity-50"
+                      >
+                        <X className="w-5 h-5" />
+                        Unlist
+                      </button>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
@@ -908,15 +1041,15 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                     onClick={handleContactClick}
                     className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
-                    <Phone className="w-5 h-5" />
-                    Show Contact
+                    <PhoneCall className="w-5 h-5" />
+                    Call
                   </button>
                   <button 
                     onClick={handleStartChat}
                     className="w-full bg-white border-2 border-emerald-500 text-emerald-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all"
                   >
                     <MessageCircle className="w-5 h-5" />
-                    Start Chat
+                    Chat
                   </button>
                   <button 
                     onClick={() => onFavorite?.(product.id)}
@@ -951,12 +1084,12 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
 
       {/* Mobile Sticky Bottom Actions */}
       {!isOwner && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
           <button 
             onClick={handleContactClick}
             className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95"
           >
-            <Phone className="w-5 h-5" />
+            <PhoneCall className="w-5 h-5" />
             Call
           </button>
           <button 
@@ -971,21 +1104,64 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
 
       {/* Mobile Owner Actions */}
       {isOwner && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-          <button 
-            onClick={() => onEdit?.(product)}
-            className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2"
-          >
-            <Edit3 className="w-5 h-5" />
-            Edit
-          </button>
-          <button 
-            onClick={() => onDelete?.(product?.id || '')}
-            className="flex-1 bg-red-50 text-red-500 border-2 border-red-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2"
-          >
-            <Trash2 className="w-5 h-5" />
-            Delete
-          </button>
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-gray-100 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <button 
+              onClick={() => onEdit?.(product)}
+              className="flex-1 bg-emerald-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <Edit3 className="w-5 h-5" />
+              Edit
+            </button>
+            <button 
+              onClick={() => onDelete?.(product?.id || '')}
+              className="flex-1 bg-red-50 text-red-500 border-2 border-red-500 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <Trash2 className="w-5 h-5" />
+              Delete
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {product.status === 'active' ? (
+              <button 
+                onClick={() => handleStatusUpdate('sold')}
+                disabled={isUpdatingStatus}
+                className="flex-1 bg-white border-2 border-emerald-500 text-emerald-600 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Mark Sold
+              </button>
+            ) : (
+              <button 
+                onClick={() => handleStatusUpdate('active')}
+                disabled={isUpdatingStatus}
+                className="flex-1 bg-white border-2 border-emerald-500 text-emerald-600 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Relist
+              </button>
+            )}
+
+            {product.status === 'hidden' ? (
+              <button 
+                onClick={() => handleStatusUpdate('active')}
+                disabled={isUpdatingStatus}
+                className="flex-1 bg-white border-2 border-gray-200 text-gray-500 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                List Back
+              </button>
+            ) : (
+              <button 
+                onClick={() => handleStatusUpdate('hidden')}
+                disabled={isUpdatingStatus}
+                className="flex-1 bg-white border-2 border-gray-200 text-gray-500 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+                Unlist
+              </button>
+            )}
+          </div>
         </div>
       )}
 
