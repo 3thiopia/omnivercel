@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Package, Trash2, ExternalLink, CheckCircle2, RefreshCw, AlertCircle, Edit3, User, Heart, Star, MessageSquare, Loader2, Clock, ArrowLeft } from 'lucide-react';
+import { Package, Trash2, ExternalLink, CheckCircle2, RefreshCw, AlertCircle, Edit3, User, Heart, Star, MessageSquare, Loader2, Clock, ArrowLeft, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -289,87 +289,108 @@ export const MyListings = ({ user, onBack, onViewProduct }: MyListingsProps) => 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 flex gap-4"
+                  className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col sm:flex-row group hover:shadow-md transition-all duration-300"
                 >
-                  <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 relative">
+                  {/* Image Section */}
+                  <div className="relative w-full sm:w-48 h-56 sm:h-auto flex-shrink-0 bg-gray-50 overflow-hidden">
                     <LazyImage 
-                      src={getOptimizedImageUrl(listing.image, { width: 300, height: 300 })} 
+                      src={getOptimizedImageUrl(listing.image, { width: 400, height: 400 })} 
                       alt={listing.title} 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
+                    
+                    {/* Status Badge Overlay */}
+                    <div className="absolute top-4 left-4 flex flex-col gap-2">
+                       <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase shadow-lg backdrop-blur-md ${listing.status === 'active' ? 'bg-emerald-500/90 text-white' : 'bg-gray-500/90 text-white'}`}>
+                         {listing.status}
+                       </span>
+                       {listing.isPromoted && (
+                         <span className="bg-amber-500/90 text-white text-[10px] font-black uppercase px-3 py-1 rounded-xl shadow-lg backdrop-blur-md">Featured</span>
+                       )}
+                    </div>
+
                     {listing.status === 'sold' && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <span className="bg-red-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md">Sold</span>
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+                        <div className="bg-white/90 backdrop-blur-md text-red-600 text-xs font-black uppercase px-4 py-2 rounded-2xl shadow-xl transform -rotate-12 border-2 border-red-600">
+                          Sold Out
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start gap-2">
-                        <h3 className="font-bold text-gray-900 truncate text-base sm:text-lg">{listing.title}</h3>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase flex-shrink-0 ${listing.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-500'}`}>
-                          {listing.status}
-                        </span>
+                  {/* Content Section */}
+                  <div className="flex-1 p-5 lg:p-6 flex flex-col">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-black text-gray-900 text-lg lg:text-xl truncate leading-tight mb-1 group-hover:text-emerald-600 transition-colors">
+                          {listing.title}
+                        </h3>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-emerald-600 font-black text-2xl tracking-tight">Br{listing.price.toLocaleString()}</span>
+                        </div>
                       </div>
-                      <p className="text-emerald-600 font-black text-lg">Br{listing.price.toLocaleString()}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{listing.location}</p>
-                        {listing.condition && (
-                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100/50">
-                            {listing.condition}
-                          </span>
-                        )}
-                        {listing.postedAt && (
-                          <div className="flex items-center gap-1 text-[10px] text-gray-400 font-medium">
-                            <Clock className="w-2.5 h-2.5" />
-                            <span>{formatDistanceToNow(new Date(listing.postedAt), { addSuffix: true })}</span>
-                          </div>
-                        )}
-                      </div>
+                      <button 
+                        onClick={() => onViewProduct(listing)}
+                        className="p-2.5 bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 rounded-2xl transition-all active:scale-90"
+                        title="View Listing"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                      </button>
                     </div>
 
-                    <div className="flex items-center gap-2 mt-4 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-y-2 gap-x-4 mb-6">
+                       <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                         <MapPin className="w-3.5 h-3.5 text-gray-300" />
+                         {listing.location}
+                       </div>
+                       {listing.condition && (
+                         <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg">
+                           <Package className="w-3.5 h-3.5" />
+                           {listing.condition}
+                         </div>
+                       )}
+                       {listing.postedAt && (
+                         <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                           <Clock className="w-3.5 h-3.5 text-gray-300" />
+                           {formatDistanceToNow(new Date(listing.postedAt), { addSuffix: true })}
+                         </div>
+                       )}
+                    </div>
+
+                    {/* Action Buttons - Bottom Row */}
+                    <div className="grid grid-cols-3 gap-3 mt-auto pt-5 border-t border-gray-50">
                       {listing.status === 'active' ? (
                         <button 
                           onClick={() => handleStatusUpdate(listing.id, 'sold')}
-                          className="bg-emerald-50 text-emerald-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-100 transition-all active:scale-95 flex items-center justify-center gap-1"
+                          className="flex flex-col items-center justify-center gap-1.5 py-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-100 transition-all active:scale-95 group/btn"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Mark Sold
+                          <CheckCircle2 className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">Sold</span>
                         </button>
                       ) : (
                         <button 
                           onClick={() => handleStatusUpdate(listing.id, 'active')}
-                          className="bg-gray-50 text-gray-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-gray-100 transition-all active:scale-95 flex items-center justify-center gap-1"
+                          className="flex flex-col items-center justify-center gap-1.5 py-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-100 transition-all active:scale-95 group/btn"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                          Make Active
+                          <RefreshCw className="w-5 h-5 group-hover/btn:rotate-180 transition-transform duration-500" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">Active</span>
                         </button>
                       )}
                       
                       <button 
                         onClick={() => setEditingListing(listing)}
-                        className="bg-gray-50 text-gray-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-gray-100 transition-all active:scale-95 flex items-center justify-center gap-1"
+                        className="flex flex-col items-center justify-center gap-1.5 py-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-100 transition-all active:scale-95 group/btn"
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        Edit
+                        <Edit3 className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Edit</span>
                       </button>
                       
                       <button 
                         onClick={() => handleDelete(listing.id)}
-                        className="bg-red-50 text-red-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-1"
+                        className="flex flex-col items-center justify-center gap-1.5 py-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all active:scale-95 group/btn"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete
-                      </button>
-                      
-                      <button 
-                        onClick={() => onViewProduct(listing)}
-                        className="p-2 text-gray-400 hover:text-blue-500 transition-all ml-auto"
-                        title="View Listing"
-                      >
-                        <ExternalLink className="w-5 h-5" />
+                        <Trash2 className="w-5 h-5 group-hover/btn:shake transition-transform" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Delete</span>
                       </button>
                     </div>
                   </div>

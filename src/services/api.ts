@@ -208,6 +208,7 @@ export const api = {
       min_price?: number;
       max_price?: number;
       location?: string;
+      attributes?: Record<string, string>;
       page?: number;
       limit?: number;
     }, _token?: string): Promise<Listing[]> => {
@@ -231,7 +232,26 @@ export const api = {
 
       // 2. Search Filter
       if (params?.search) {
-        query = query.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+        const searchFields = [
+          `title.ilike.%${params.search}%`,
+          `description.ilike.%${params.search}%`,
+          `attributes->>brand.ilike.%${params.search}%`,
+          `attributes->>make.ilike.%${params.search}%`,
+          `attributes->>model_series.ilike.%${params.search}%`,
+          `attributes->>processor.ilike.%${params.search}%`,
+          `attributes->>storage.ilike.%${params.search}%`,
+          `attributes->>ram.ilike.%${params.search}%`,
+          `attributes->>year.ilike.%${params.search}%`,
+          `attributes->>type.ilike.%${params.search}%`,
+          `attributes->>material.ilike.%${params.search}%`,
+          `attributes->>body_type.ilike.%${params.search}%`,
+          `attributes->>fuel_type.ilike.%${params.search}%`,
+          `attributes->>transmission.ilike.%${params.search}%`,
+          `attributes->>property_type.ilike.%${params.search}%`,
+          `attributes->>resolution.ilike.%${params.search}%`,
+          `attributes->>movement.ilike.%${params.search}%`
+        ];
+        query = query.or(searchFields.join(','));
       }
       
       // 3. Category Filter
@@ -254,7 +274,16 @@ export const api = {
       if (params?.max_price) query = query.lte('price', params.max_price);
       if (params?.location) query = query.ilike('location', `%${params.location}%`);
       
-      // 5. Sorting
+      // 5. Attribute Filters (JSONB)
+      if (params?.attributes) {
+        Object.entries(params.attributes).forEach(([key, value]) => {
+          if (value) {
+            query = query.eq(`attributes->>${key}`, value);
+          }
+        });
+      }
+      
+      // 6. Sorting
       if (params?.sort && params.sort !== 'likes_count') {
         query = query.order(params.sort, { ascending: params.order === 'asc' });
       } else if (!params?.sort) {
@@ -351,7 +380,8 @@ export const api = {
         isFavorited,
         is_ad: data.is_ad,
         ad_row: data.ad_row,
-        ad_col: data.ad_col
+        ad_col: data.ad_col,
+        attributes: data.attributes || {}
       };
     },
     create: async (listing: any, _token?: string): Promise<Listing> => {
@@ -367,6 +397,8 @@ export const api = {
           thumbnail_url: listing.image,
           description: listing.description,
           category_id: listing.category_id,
+          condition: listing.condition,
+          attributes: listing.attributes || {},
           seller_id: session.user.id,
           status: 'active'
         }])
@@ -394,6 +426,8 @@ export const api = {
       if (updates.image !== undefined) updateData.thumbnail_url = updates.image;
       if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.category_id !== undefined) updateData.category_id = updates.category_id;
+      if (updates.condition !== undefined) updateData.condition = updates.condition;
+      if (updates.attributes !== undefined) updateData.attributes = updates.attributes;
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.is_ad !== undefined) updateData.is_ad = updates.is_ad;
       if (updates.ad_row !== undefined) updateData.ad_row = updates.ad_row;
@@ -485,13 +519,65 @@ export const api = {
       const { count: listingsCount } = await supabase.from('listings').select('*', { count: 'exact', head: true });
       const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
       const { count: reportsCount } = await supabase.from('reports').select('*', { count: 'exact', head: true });
+      const { count: adsCount } = await supabase.from('listings').select('*', { count: 'exact', head: true }).eq('is_ad', true);
       
       return [
         { label: 'Total Listings', value: (listingsCount || 0).toString(), change: '+12%', icon: 'Package', color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Active Users', value: (usersCount || 0).toString(), change: '+5%', icon: 'User', color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Pending Reports', value: (reportsCount || 0).toString(), change: '-2%', icon: 'ShieldCheck', color: 'text-red-600', bg: 'bg-red-50' }
+        { label: 'Active Users', value: (usersCount || 0).toString(), change: '+5%', icon: 'Users', color: 'text-green-600', bg: 'bg-green-50' },
+        { label: 'Pending Reports', value: (reportsCount || 0).toString(), change: '-2%', icon: 'Flag', color: 'text-red-600', bg: 'bg-red-50' },
+        { label: 'Active Ads', value: (adsCount || 0).toString(), change: '+8%', icon: 'BarChart3', color: 'text-purple-600', bg: 'bg-purple-50' }
       ];
     },
+  },
+  admin: {
+    getRecentActivity: async (): Promise<any[]> => {
+      const { data: listings } = await supabase
+        .from('listings')
+        .select('*, profiles(full_name)')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      const { data: reports } = await supabase
+        .from('reports')
+        .select('*, profiles(full_name), listings(title)')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      const activity = [
+        ...(listings || []).map(l => ({
+          id: `listing-${l.id}`,
+          type: 'listing',
+          title: 'New Listing',
+          description: `${l.profiles?.full_name || 'A user'} posted "${l.title}"`,
+          time: l.created_at,
+          icon: 'Package',
+          color: 'text-blue-500',
+          bg: 'bg-blue-50'
+        })),
+        ...(reports || []).map(r => ({
+          id: `report-${r.id}`,
+          type: 'report',
+          title: 'New Report',
+          description: `Listing "${r.listings?.title || 'Unknown'}" was reported for ${r.reason}`,
+          time: r.created_at,
+          icon: 'Flag',
+          color: 'text-red-500',
+          bg: 'bg-red-50'
+        }))
+      ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+      
+      return activity.slice(0, 8);
+    },
+    getChartData: async (): Promise<any[]> => {
+      // Mocking chart data for now as complex aggregation is better done server-side or with more queries
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return days.map(day => ({
+        name: day,
+        listings: Math.floor(Math.random() * 50) + 10,
+        users: Math.floor(Math.random() * 20) + 5,
+        reports: Math.floor(Math.random() * 5)
+      }));
+    }
   },
   users: {
     getMe: async (_token: string): Promise<UserProfile> => {

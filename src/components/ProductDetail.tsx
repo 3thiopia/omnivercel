@@ -25,7 +25,8 @@ import {
   Copy,
   PhoneCall,
   Home,
-  CheckCircle2
+  CheckCircle2,
+  Cpu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -610,6 +611,28 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 {product.description || "No description provided."}
               </p>
             </div>
+
+            {/* Specifications */}
+            {product.attributes && Object.keys(product.attributes).length > 0 && (
+              <div className="space-y-4 pt-6 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <h2 className="text-lg font-black text-gray-900 uppercase tracking-widest">Specifications</h2>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {Object.entries(product.attributes).map(([key, value]) => (
+                    <div key={key} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                        {key.replace(/_/g, ' ')}
+                      </p>
+                      <p className="text-sm font-bold text-gray-900">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Seller Info - Mobile (Integrated into main flow) */}

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle2, Tag, Upload, MapPin, Loader2, GripVertical, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, Tag, Upload, MapPin, Loader2, GripVertical, AlertCircle, Cpu } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { getAttributesForCategory } from '../constants/attributes';
 import {
   DndContext,
   closestCenter,
@@ -108,6 +109,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   
   const [selectedMainCategory, setSelectedMainCategory] = useState<string>('');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('');
+  const [dynamicAttributes, setDynamicAttributes] = useState<Record<string, string>>(editListing?.attributes || {});
   
   const {
     register,
@@ -186,12 +188,14 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         
         setPreviews(editListing.images || (editListing.image ? [editListing.image] : []));
         setFileMap(new Map());
+        setDynamicAttributes(editListing.attributes || {});
       } else {
         reset({ title: '', category: '', price: '', location: '', description: '', condition: 'Used' });
         setSelectedMainCategory('');
         setSelectedSubCategory('');
         setPreviews([]);
         setFileMap(new Map());
+        setDynamicAttributes({});
         fetchUserProfile();
       }
     }
@@ -382,6 +386,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         category: categoryName,
         category_id: categoryId,
         condition: data.condition,
+        attributes: dynamicAttributes,
       };
 
       if (editListing) {
@@ -585,6 +590,56 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                   <input type="hidden" name="category" value={formData.category} required />
                 </div>
 
+                {/* Step 1.5: Dynamic Attributes */}
+                {(() => {
+                  const subCat = categories.find(c => String(c.id) === selectedSubCategory);
+                  const mainCat = categories.find(c => String(c.id) === selectedMainCategory);
+                  const catName = subCat?.name || mainCat?.name || '';
+                  const attrs = getAttributesForCategory(catName);
+                  
+                  if (attrs.length === 0) return null;
+                  
+                  return (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm">
+                          <Cpu className="w-4 h-4" />
+                        </div>
+                        <label className="text-sm font-black text-gray-900 uppercase tracking-widest">Specifications (Optional)</label>
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-medium -mt-4 italic ml-11">Adding these details helps your ad stand out, but you can skip them if you want.</p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                        {attrs.map((attr) => (
+                          <div key={attr.id} className="space-y-1.5">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{attr.label}</label>
+                            {attr.type === 'select' ? (
+                              <select
+                                value={dynamicAttributes[attr.id] || ''}
+                                onChange={(e) => setDynamicAttributes(prev => ({ ...prev, [attr.id]: e.target.value }))}
+                                className="w-full px-4 py-3 bg-white border-2 border-transparent focus:border-orange-500 rounded-xl outline-none transition-all font-semibold text-sm shadow-sm"
+                              >
+                                <option value="">Select {attr.label}</option>
+                                {attr.options?.map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type={attr.type}
+                                value={dynamicAttributes[attr.id] || ''}
+                                onChange={(e) => setDynamicAttributes(prev => ({ ...prev, [attr.id]: e.target.value }))}
+                                placeholder={attr.placeholder || `Enter ${attr.label}`}
+                                className="w-full px-4 py-3 bg-white border-2 border-transparent focus:border-orange-500 rounded-xl outline-none transition-all font-semibold text-sm shadow-sm"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="space-y-6">
                   <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">2. Add Photos ({previews.length}/5)</label>
                   <p className="text-[10px] text-gray-400 font-medium -mt-4 italic">Tip: Drag photos to rearrange. The first photo will be the main cover.</p>
@@ -698,7 +753,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                 </div>
 
                 {/* Footer */}
-                <div className="pt-6 sticky bottom-0 bg-white/80 backdrop-blur-md -mx-4 sm:-mx-8 px-4 sm:px-8 pb-4">
+                <div className="pt-6 sticky bottom-0 bg-white/80 backdrop-blur-md -mx-4 sm:-mx-8 px-4 sm:px-8 pb-4 z-20">
                   <button 
                     type="submit"
                     disabled={loading}

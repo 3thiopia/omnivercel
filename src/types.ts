@@ -28,6 +28,7 @@ export interface Listing {
   ad_row?: number;
   ad_col?: number;
   condition?: 'Brand New' | 'Slightly Used' | 'Used';
+  attributes?: Record<string, string>;
 }
 
 export interface User {

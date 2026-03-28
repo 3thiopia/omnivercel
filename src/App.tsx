@@ -11,7 +11,8 @@ import { api, Listing, UserProfile } from './services/api';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETHIOPIAN_LOCATIONS } from './constants/locations';
-import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2, RefreshCw, CheckCircle2, RotateCcw } from 'lucide-react';
+import { getAttributesForCategory } from './constants/attributes';
+import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2, RefreshCw, CheckCircle2, RotateCcw, Cpu } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { getOptimizedImageUrl } from './lib/imageUtils';
 import { ProfileCompletionModal } from './components/ProfileCompletionModal';
@@ -167,12 +168,19 @@ export default function App() {
   const [locationFilter, setLocationFilter] = useState<string>('');
   const [regionFilter, setRegionFilter] = useState<string>('');
   const [subRegionFilter, setSubRegionFilter] = useState<string>('');
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [isDeletingListing, setIsDeletingListing] = useState<string | number | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const { width } = useWindowSize();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.categories.getAll(),
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
 
   // Sync activeTab with current path
   useEffect(() => {
@@ -198,7 +206,7 @@ export default function App() {
     isLoading: isListingsLoading,
     refetch: refetchListings,
   } = useInfiniteQuery({
-    queryKey: ['listings', selectedCategory, searchQuery, sortBy, sortOrder, minPrice, maxPrice, locationFilter],
+    queryKey: ['listings', selectedCategory, searchQuery, sortBy, sortOrder, minPrice, maxPrice, locationFilter, selectedAttributes],
     queryFn: async ({ pageParam = 1 }) => {
       const { data: { session } } = await supabase.auth.getSession();
       return api.listings.getAll({ 
@@ -209,6 +217,7 @@ export default function App() {
         min_price: minPrice ? parseFloat(minPrice) : undefined,
         max_price: maxPrice ? parseFloat(maxPrice) : undefined,
         location: locationFilter || undefined,
+        attributes: Object.keys(selectedAttributes).length > 0 ? selectedAttributes : undefined,
         page: pageParam,
         limit: 20
       }, session?.access_token);
@@ -698,7 +707,7 @@ export default function App() {
                   </motion.form>
 
                   {/* Active Filters & Clear All */}
-                  {(searchQuery || selectedCategory || minPrice || maxPrice || regionFilter || subRegionFilter) && (
+                  {(searchQuery || selectedCategory || minPrice || maxPrice || regionFilter || subRegionFilter || Object.values(selectedAttributes).some(v => v)) && (
                     <motion.div 
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -717,6 +726,14 @@ export default function App() {
                           Category Active
                         </span>
                       )}
+
+                      {Object.entries(selectedAttributes).map(([key, value]) => (
+                        value && (
+                          <span key={key} className="bg-orange-50 text-orange-700 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-orange-100">
+                            {key.replace(/_/g, ' ')}: {value}
+                          </span>
+                        )
+                      ))}
 
                       {(minPrice || maxPrice) && (
                         <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-emerald-100">
@@ -739,6 +756,7 @@ export default function App() {
                           setRegionFilter('');
                           setSubRegionFilter('');
                           setSelectedCategory(null);
+                          setSelectedAttributes({});
                           setSortBy('created_at');
                           setSortOrder('desc');
                           setTimeout(() => refetchListings(), 0);
@@ -841,6 +859,41 @@ export default function App() {
                             </div>
                           </div>
 
+                          {/* Dynamic Attribute Filters */}
+                          {(() => {
+                            if (!selectedCategory || !categories) return null;
+                            
+                            const currentCat = categories.find(c => String(c.id) === selectedCategory);
+                            if (!currentCat) return null;
+                            
+                            const attrs = getAttributesForCategory(currentCat.name);
+                            if (attrs.length === 0) return null;
+                            
+                            return (
+                              <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-gray-50">
+                                <div className="sm:col-span-4 flex items-center gap-2">
+                                  <Cpu className="w-3 h-3 text-orange-500" />
+                                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Specifications Filters</span>
+                                </div>
+                                {attrs.map((attr) => (
+                                  <div key={attr.id} className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{attr.label}</label>
+                                    <select
+                                      value={selectedAttributes[attr.id] || ''}
+                                      onChange={(e) => setSelectedAttributes(prev => ({ ...prev, [attr.id]: e.target.value }))}
+                                      className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none cursor-pointer"
+                                    >
+                                      <option value="">All {attr.label}s</option>
+                                      {attr.options?.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+
                           {/* Apply Button */}
                           <div className="sm:col-span-3 flex justify-end gap-2 pt-2 border-t border-gray-50">
                             <button 
@@ -851,6 +904,7 @@ export default function App() {
                                 setRegionFilter('');
                                 setSubRegionFilter('');
                                 setSelectedCategory(null);
+                                setSelectedAttributes({});
                                 setSortBy('created_at');
                                 setSortOrder('desc');
                               }}
@@ -881,6 +935,7 @@ export default function App() {
                     onSelect={(id) => {
                       const newId = selectedCategory === id ? null : id;
                       setSelectedCategory(newId);
+                      setSelectedAttributes({});
                     }} 
                   />
                 </section>
@@ -1016,6 +1071,10 @@ export default function App() {
                   listings={listings} 
                   onBack={() => navigate('/')} 
                   onViewProduct={(listing: any) => handleOpenListing(listing)}
+                  onEditListing={(listing: any) => {
+                    setEditingListing(listing);
+                    setIsPostAdOpen(true);
+                  }}
                 />
               ) : <Navigate to="/" />
             } />

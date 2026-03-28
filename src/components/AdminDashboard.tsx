@@ -27,8 +27,25 @@ import {
   Clock,
   ChevronRight,
   AlertTriangle,
-  Calendar
+  Calendar,
+  TrendingUp,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area,
+  LineChart,
+  Line
+} from 'recharts';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
@@ -40,16 +57,21 @@ interface AdminDashboardProps {
   listings: Listing[];
   onBack: () => void;
   onViewProduct: (listing: Listing) => void;
+  onEditListing: (listing: Listing) => void;
 }
 
 const ICON_MAP: Record<string, any> = {
   Package,
   Users,
   BarChart3,
-  FolderTree
+  FolderTree,
+  AlertTriangle,
+  TrendingUp,
+  Flag,
+  Activity
 };
 
-export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboardProps) => {
+export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing }: AdminDashboardProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'users' | 'categories' | 'reports' | 'ads'>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [localListings, setLocalListings] = useState<Listing[]>(listings);
@@ -83,6 +105,9 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
   const [adCategoryFilter, setAdCategoryFilter] = useState('all');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -103,6 +128,7 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
     }
     if (activeTab === 'overview') {
       fetchStats();
+      fetchOverviewData();
     }
     if (activeTab === 'listings') {
       fetchListings();
@@ -119,6 +145,22 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
       fetchCategories();
     }
   }, [activeTab]);
+
+  const fetchOverviewData = async () => {
+    setIsLoadingOverview(true);
+    try {
+      const [activity, chart] = await Promise.all([
+        api.admin.getRecentActivity(),
+        api.admin.getChartData()
+      ]);
+      setRecentActivity(activity);
+      setChartData(chart);
+    } catch (error) {
+      console.error('Error fetching overview data:', error);
+    } finally {
+      setIsLoadingOverview(false);
+    }
+  };
 
   const fetchReports = async () => {
     setIsLoadingReports(true);
@@ -619,7 +661,7 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-6 lg:space-y-8"
+              className="space-y-8"
             >
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
@@ -637,128 +679,177 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
               </div>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {isLoadingStats ? (
-                  [...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-white p-5 lg:p-6 rounded-3xl border border-gray-100 shadow-sm animate-pulse">
+                  [...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm animate-pulse">
                       <div className="h-12 w-12 bg-gray-200 rounded-2xl mb-4"></div>
                       <div className="h-4 w-24 bg-gray-200 rounded mb-2"></div>
                       <div className="h-8 w-32 bg-gray-200 rounded"></div>
                     </div>
                   ))
                 ) : (
-                  stats.map((stat, i) => {
-                    const IconComponent = ICON_MAP[stat.icon] || Package;
+                  stats.map((stat, idx) => {
+                    const Icon = ICON_MAP[stat.icon] || Package;
+                    const isPositive = stat.change.startsWith('+');
                     return (
-                      <div key={i} className="bg-white p-5 lg:p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className={`p-3 rounded-2xl bg-${stat.color}-50`}>
-                            <IconComponent className={`w-6 h-6 text-${stat.color}-600`} />
+                      <motion.div 
+                        key={idx}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className={`w-12 h-12 ${stat.bg} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                            <Icon className={`w-6 h-6 ${stat.color}`} />
                           </div>
-                          <span className="text-emerald-500 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-lg">
-                            +12%
-                          </span>
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black ${isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                            {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                            {stat.change}
+                          </div>
                         </div>
-                        <p className="text-gray-500 text-sm font-medium mb-1">{stat.label}</p>
-                        <h3 className="text-2xl lg:text-3xl font-black text-gray-900">{stat.value}</h3>
-                      </div>
+                        <h3 className="text-gray-500 text-xs font-black uppercase tracking-widest mb-1">{stat.label}</h3>
+                        <p className="text-3xl font-black text-gray-900 tracking-tight">{stat.value}</p>
+                      </motion.div>
                     );
                   })
                 )}
               </div>
 
-              {/* Recent Reports Widget */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                    <div>
-                      <h3 className="text-lg font-black text-gray-900 tracking-tight">Recent Reports</h3>
-                      <p className="text-xs text-gray-500 font-medium">Latest violations reported by users</p>
-                    </div>
-                    <button 
-                      onClick={() => setActiveTab('reports')}
-                      className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700 transition-colors"
-                    >
-                      View All
-                    </button>
-                  </div>
-                  <div className="divide-y divide-gray-50">
-                    {reports.filter(r => r.status === 'pending').slice(0, 5).length === 0 ? (
-                      <div className="p-12 text-center">
-                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                          <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-                        </div>
-                        <p className="text-gray-500 font-medium">No pending reports to show.</p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Chart Section */}
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h3 className="text-xl font-black text-gray-900 tracking-tight">Platform Growth</h3>
+                        <p className="text-gray-500 text-sm font-medium">Activity overview for the last 7 days</p>
                       </div>
-                    ) : (
-                      reports.filter(r => r.status === 'pending').slice(0, 5).map((report) => (
-                        <div 
-                          key={report.id} 
-                          onClick={() => { setActiveTab('reports'); setSelectedReport(report); }}
-                          className="px-8 py-4 flex items-center justify-between hover:bg-gray-50 transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-4">
-                            <img 
-                              src={report.listing?.thumbnail_url || 'https://picsum.photos/seed/placeholder/100/100'} 
-                              alt="" 
-                              className="w-10 h-10 rounded-xl object-cover shadow-sm"
-                            />
-                            <div>
-                              <p className="text-sm font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">{report.listing?.title}</p>
-                              <p className="text-[10px] text-gray-400 font-medium">{report.reason} • {new Date(report.created_at).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-emerald-500 transition-all group-hover:translate-x-1" />
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Listings</span>
                         </div>
-                      ))
-                    )}
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Users</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="colorListings" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                            </linearGradient>
+                            <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis 
+                            dataKey="name" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}
+                            dy={10}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              borderRadius: '20px', 
+                              border: 'none', 
+                              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                              padding: '12px 16px'
+                            }}
+                            itemStyle={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase' }}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="listings" 
+                            stroke="#10b981" 
+                            strokeWidth={4}
+                            fillOpacity={1} 
+                            fill="url(#colorListings)" 
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="users" 
+                            stroke="#3b82f6" 
+                            strokeWidth={4}
+                            fillOpacity={1} 
+                            fill="url(#colorUsers)" 
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Add Category', icon: Plus, color: 'text-blue-600', bg: 'bg-blue-50', tab: 'categories' },
+                      { label: 'Review Reports', icon: Flag, color: 'text-red-600', bg: 'bg-red-50', tab: 'reports' },
+                      { label: 'Manage Ads', icon: BarChart3, color: 'text-purple-600', bg: 'bg-purple-50', tab: 'ads' },
+                      { label: 'User List', icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50', tab: 'users' }
+                    ].map((action, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveTab(action.tab as any)}
+                        className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-3 group"
+                      >
+                        <div className={`w-10 h-10 ${action.bg} ${action.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <action.icon className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{action.label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Quick Actions / System Status */}
-                <div className="space-y-6">
-                  <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-xl shadow-gray-900/20 relative overflow-hidden">
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-black mb-2">System Status</h3>
-                      <div className="flex items-center gap-2 mb-6">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">All Systems Operational</span>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400 font-medium">Database</span>
-                          <span className="font-bold">Healthy</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400 font-medium">Auth Service</span>
-                          <span className="font-bold">Active</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400 font-medium">Storage</span>
-                          <span className="font-bold">92% Free</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+                {/* Recent Activity */}
+                <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Recent Activity</h3>
+                    <Activity className="w-5 h-5 text-gray-400" />
                   </div>
-
-                  <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">Quick Links</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button 
-                        onClick={() => setActiveTab('listings')}
-                        className="p-3 bg-gray-50 rounded-2xl text-xs font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all text-center"
-                      >
-                        Manage Ads
-                      </button>
-                      <button 
-                        onClick={() => setActiveTab('users')}
-                        className="p-3 bg-gray-50 rounded-2xl text-xs font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all text-center"
-                      >
-                        User List
-                      </button>
-                    </div>
+                  <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                    {recentActivity.map((item, idx) => {
+                      const Icon = ICON_MAP[item.icon] || Package;
+                      return (
+                        <div key={item.id} className="flex gap-4 relative group">
+                          {idx !== recentActivity.length - 1 && (
+                            <div className="absolute left-5 top-10 bottom-[-24px] w-[2px] bg-gray-50 group-hover:bg-gray-100 transition-colors"></div>
+                          )}
+                          <div className={`w-10 h-10 ${item.bg} ${item.color} rounded-xl flex items-center justify-center flex-shrink-0 z-10 shadow-sm`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 pt-1">
+                            <p className="text-xs font-black text-gray-900 uppercase tracking-tight mb-0.5">{item.title}</p>
+                            <p className="text-[11px] text-gray-500 font-medium leading-relaxed mb-1">{item.description}</p>
+                            <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                              <Clock className="w-3 h-3" />
+                              {new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                  <button 
+                    onClick={() => setActiveTab('listings')}
+                    className="mt-8 w-full py-3 bg-gray-50 text-gray-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all"
+                  >
+                    View All Activity
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -894,6 +985,13 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
                           </button>
                         )}
                         <button 
+                          onClick={() => onEditListing(listing)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-[10px] font-bold uppercase transition-all"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                        <button 
                           onClick={() => onViewProduct(listing)}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 hover:bg-gray-50 rounded-lg text-[10px] font-bold uppercase transition-all"
                         >
@@ -1028,6 +1126,13 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboa
                                   <RotateCcw className="w-5 h-5" />
                                 </button>
                               )}
+                              <button 
+                                onClick={() => onEditListing(listing)}
+                                className="p-2 text-gray-400 hover:text-blue-500 transition-all rounded-xl hover:bg-gray-50"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-5 h-5" />
+                              </button>
                               <button 
                                 onClick={() => onViewProduct(listing)}
                                 className="p-2 text-gray-400 hover:text-emerald-500 transition-all rounded-xl hover:bg-gray-50"
