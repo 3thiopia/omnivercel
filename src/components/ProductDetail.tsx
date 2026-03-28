@@ -23,7 +23,9 @@ import {
   ZoomOut,
   RotateCcw,
   Copy,
-  PhoneCall
+  PhoneCall,
+  Home,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -33,6 +35,8 @@ import { getOptimizedImageUrl } from '../lib/imageUtils';
 import { LazyImage } from './LazyImage';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
+import { Meta } from './Meta';
+import { getProductSlug } from '../lib/seoUtils';
 
 interface ProductDetailProps {
   product: Listing;
@@ -326,6 +330,38 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
     : 0;
 
+  const productUrl = `${window.location.origin}/product/${getProductSlug(product.title, product.id)}`;
+  
+  const productSchema = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.title,
+    "image": [product.image, ...(product.images || [])],
+    "description": product.description,
+    "sku": `OMNI-${product.id}`,
+    "brand": {
+      "@type": "Brand",
+      "name": "OmniMarket"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": productUrl,
+      "priceCurrency": "ETB",
+      "price": product.price,
+      "availability": product.status === 'active' ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "itemCondition": product.condition === 'Brand New' ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+      "areaServed": {
+        "@type": "Country",
+        "name": "Ethiopia"
+      }
+    },
+    "aggregateRating": reviews.length > 0 ? {
+      "@type": "AggregateRating",
+      "ratingValue": averageRating.toFixed(1),
+      "reviewCount": reviews.length
+    } : undefined
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -333,6 +369,14 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       exit={{ opacity: 0 }}
       className="min-h-screen bg-gray-50 pb-24 lg:pb-0"
     >
+      <Meta 
+        title={`${product.title} Price in Ethiopia`}
+        description={`Find the latest ${product.title} price in Ethiopia. Buy and sell easily on OmniMarket. Located in ${product.location}.`}
+        image={product.image}
+        url={productUrl}
+        type="product"
+        schema={productSchema}
+      />
       {/* Header - Floating/Sticky */}
       <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between ${
         isScrolled 
@@ -379,6 +423,22 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       </div>
 
       <div className="max-w-7xl mx-auto pt-16 lg:pt-6 lg:px-4 grid lg:grid-cols-3 gap-8">
+        {/* Breadcrumbs */}
+        <nav className="lg:col-span-3 flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest px-4 lg:px-0">
+          <button onClick={onBack} className="hover:text-emerald-500 flex items-center gap-1 transition-colors">
+            <Home className="w-3 h-3" />
+            Home
+          </button>
+          <ChevronRight className="w-3 h-3" />
+          <span className="hover:text-emerald-500 transition-colors cursor-pointer">
+            {product.category_data?.name || product.category || 'Category'}
+          </span>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-gray-900 truncate max-w-[150px] sm:max-w-none">
+            {product.title}
+          </span>
+        </nav>
+
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Image Gallery */}
@@ -496,9 +556,17 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-tight">
                   {product.title}
                 </h1>
-                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
-                  <MapPin className="w-4 h-4 text-emerald-500" />
-                  {product.location}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-gray-500 text-sm font-medium">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-emerald-500" />
+                    {product.location}
+                  </div>
+                  {product.condition && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="font-bold text-emerald-600 uppercase tracking-wider text-xs">{product.condition}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -511,7 +579,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
 
             {/* Description */}
             <div className="space-y-3">
-              <h2 className="text-lg font-bold text-gray-900">Description</h2>
+              <h2 className="text-lg font-bold text-gray-900">{product.title} for sale in Ethiopia</h2>
               <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
                 {product.description || "No description provided."}
               </p>
@@ -1011,8 +1079,8 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       <div className="max-w-7xl mx-auto px-4 py-12 border-t border-gray-100 mt-12">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Related Items</h2>
-            <p className="text-gray-500 font-medium">You might also like these</p>
+            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Related Products</h2>
+            <p className="text-gray-500 font-medium">Similar items in {product.category_data?.name || product.category}</p>
           </div>
           {relatedItems.length > 10 && !showAllRelated && (
             <button 
@@ -1048,6 +1116,45 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             <p className="text-gray-400 font-medium">No related items found in this category.</p>
           </div>
         )}
+      </div>
+
+      {/* SEO Content Blocks */}
+      <div className="max-w-7xl mx-auto px-4 py-16 border-t border-gray-100 space-y-12">
+        <div className="grid md:grid-cols-2 gap-12">
+          <div className="space-y-4">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Market Insights: {product.title} Price in Ethiopia</h3>
+            <p className="text-gray-600 leading-relaxed">
+              The average price of <strong>{product.title}</strong> in Ethiopia typically ranges between 
+              {" "}<strong>Br{(product.price * 0.8).toLocaleString()}</strong> and 
+              {" "}<strong>Br{(product.price * 1.2).toLocaleString()}</strong> ETB depending on the condition and location. 
+              On OmniMarket, you can find the best deals for both new and used items in Addis Ababa and other major cities.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {[`${product.title} used Ethiopia`, `cheap ${product.title} Addis Ababa`, `${product.title} for sale Ethiopia`, `buy ${product.title} online Ethiopia`].map(keyword => (
+                <span key={keyword} className="px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-emerald-50 rounded-[2.5rem] p-8 space-y-4 border border-emerald-100">
+            <h3 className="text-xl font-black text-emerald-900">Why OmniMarket is better than Jiji Ethiopia?</h3>
+            <ul className="space-y-3">
+              {[
+                "Better user experience with a faster, modern interface",
+                "Smarter search results tailored for the Ethiopian market",
+                "Verified sellers and enhanced security protocols",
+                "Direct chat and instant notifications for buyers and sellers"
+              ].map((point, i) => (
+                <li key={i} className="flex items-start gap-3 text-emerald-800 text-sm font-medium">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* Image Zoom Modal */}

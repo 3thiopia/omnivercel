@@ -11,7 +11,7 @@ interface VirtualListingGridProps {
   isFetchingNextPage: boolean;
   hasNextPage: boolean | undefined;
   fetchNextPage: () => void;
-  handleOpenListing: (id: string | number) => void;
+  handleOpenListing: (listing: any) => void;
   handleToggleFavorite: (id: string | number) => void;
 }
 
@@ -48,10 +48,11 @@ export const VirtualListingGrid: React.FC<VirtualListingGridProps> = ({
               isPromoted={listing.isPromoted}
               isFavorited={listing.isFavorited}
               likesCount={listing.likes_count}
+              condition={listing.condition}
               is_ad={listing.is_ad}
               postedAt={listing.postedAt}
               viewMode={viewMode} 
-              onClick={() => handleOpenListing(listing.id)}
+              onClick={() => handleOpenListing(listing)}
               onFavorite={() => handleToggleFavorite(listing.id)}
             />
           </ComponentErrorBoundary>
@@ -79,10 +80,11 @@ export const VirtualListingGrid: React.FC<VirtualListingGridProps> = ({
                 isPromoted={listing.isPromoted}
                 isFavorited={listing.isFavorited}
                 likesCount={listing.likes_count}
+                condition={listing.condition}
                 is_ad={listing.is_ad}
                 postedAt={listing.postedAt}
                 viewMode={viewMode} 
-                onClick={() => handleOpenListing(listing.id)}
+                onClick={() => handleOpenListing(listing)}
                 onFavorite={() => handleToggleFavorite(listing.id)}
               />
             </ComponentErrorBoundary>

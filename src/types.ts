@@ -27,6 +27,7 @@ export interface Listing {
   is_ad?: boolean;
   ad_row?: number;
   ad_col?: number;
+  condition?: 'Brand New' | 'Slightly Used' | 'Used';
 }
 
 export interface User {

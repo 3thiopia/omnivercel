@@ -18,13 +18,14 @@ interface ListingCardProps {
   likesCount?: number;
   is_ad?: boolean;
   postedAt?: string;
+  condition?: string;
   viewMode?: 'grid' | 'list';
   key?: Key;
   onClick?: () => void;
   onFavorite?: (e: React.MouseEvent) => void;
 }
 
-export const ListingCard = React.memo(({ title, price, location, image, category, categoryIcon, isPromoted, isFavorited, likesCount, is_ad, postedAt, viewMode = 'grid', onClick, onFavorite }: ListingCardProps) => {
+export const ListingCard = React.memo(({ title, price, location, image, category, categoryIcon, isPromoted, isFavorited, likesCount, is_ad, postedAt, condition, viewMode = 'grid', onClick, onFavorite }: ListingCardProps) => {
   const optimizedImage = React.useMemo(() => getOptimizedImageUrl(image, { 
     width: viewMode === 'grid' ? 300 : 200,
     height: viewMode === 'grid' ? 225 : 150
@@ -105,6 +106,13 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 <span>{timeAgo}</span>
               </div>
             )}
+            {condition && (
+              <div className="mt-1">
+                <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  {condition}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
@@ -171,6 +179,13 @@ export const ListingCard = React.memo(({ title, price, location, image, category
             <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[9px] mt-0.5 font-medium">
               <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
               <span>{timeAgo}</span>
+            </div>
+          )}
+          {condition && (
+            <div className="mt-1">
+              <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                {condition}
+              </span>
             </div>
           )}
         </div>

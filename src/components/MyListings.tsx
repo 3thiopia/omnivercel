@@ -315,6 +315,11 @@ export const MyListings = ({ user, onBack, onViewProduct }: MyListingsProps) => 
                       <p className="text-emerald-600 font-black text-lg">Br{listing.price.toLocaleString()}</p>
                       <div className="flex items-center gap-3 mt-1">
                         <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{listing.location}</p>
+                        {listing.condition && (
+                          <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                            {listing.condition}
+                          </span>
+                        )}
                         {listing.postedAt && (
                           <div className="flex items-center gap-1 text-[10px] text-gray-400 font-medium">
                             <Clock className="w-2.5 h-2.5" />
@@ -396,6 +401,7 @@ export const MyListings = ({ user, onBack, onViewProduct }: MyListingsProps) => 
                   categoryIcon={listing.categoryIcon}
                   isPromoted={listing.isPromoted}
                   isFavorited={true}
+                  condition={listing.condition}
                   postedAt={listing.postedAt}
                   viewMode="grid"
                   onClick={() => onViewProduct(listing)}

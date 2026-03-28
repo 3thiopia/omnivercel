@@ -42,6 +42,9 @@ const postAdSchema = z.object({
   }),
   location: z.string().min(1, 'Location is required'),
   description: z.string().min(20, 'Description must be at least 20 characters').max(2000, 'Description too long'),
+  condition: z.enum(['Brand New', 'Slightly Used', 'Used'], {
+    required_error: 'Please select item condition',
+  }),
 });
 
 type PostAdFormData = z.infer<typeof postAdSchema>;
@@ -82,7 +85,7 @@ const SortablePhoto = ({ url, index, onRemove }: { url: string, index: number, o
       <button
         type="button"
         onClick={() => onRemove(index)}
-        className="absolute top-1 right-1 p-1 bg-red-500/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 z-20"
+        className="absolute top-1 right-1 p-1 bg-red-500/90 text-white rounded-lg sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-all hover:bg-red-600 z-20"
       >
         <X className="w-3 h-3" />
       </button>
@@ -98,7 +101,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileMap, setFileMap] = useState<Map<string, File>>(new Map());
   const [previews, setPreviews] = useState<string[]>(editListing?.images || (editListing?.image ? [editListing.image] : []));
   const [categories, setCategories] = useState<any[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -121,6 +124,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
       price: editListing?.price ? String(editListing.price) : '',
       location: editListing?.location || '',
       description: editListing?.description || '',
+      condition: editListing?.condition || 'Used',
     },
   });
 
@@ -161,6 +165,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
           price: String(editListing.price),
           location: editListing.location,
           description: editListing.description || '',
+          condition: editListing.condition || 'Used',
         });
         
         // Handle category hierarchy for editing
@@ -180,13 +185,13 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         }
         
         setPreviews(editListing.images || (editListing.image ? [editListing.image] : []));
-        setSelectedFiles([]);
+        setFileMap(new Map());
       } else {
-        reset({ title: '', category: '', price: '', location: '', description: '' });
+        reset({ title: '', category: '', price: '', location: '', description: '', condition: 'Used' });
         setSelectedMainCategory('');
         setSelectedSubCategory('');
         setPreviews([]);
-        setSelectedFiles([]);
+        setFileMap(new Map());
         fetchUserProfile();
       }
     }
@@ -241,16 +246,26 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Limit to 5 photos total (including existing ones if we were to support mixing, but for simplicity let's say new uploads replace old ones if any)
-    const totalFiles = [...selectedFiles, ...files].slice(0, 5);
-    setSelectedFiles(totalFiles);
-
-    // Create new previews for newly selected files
-    const newPreviews = totalFiles.map(file => URL.createObjectURL(file));
+    const currentCount = previews.length;
+    const remaining = 5 - currentCount;
     
-    // If editing, we might want to keep existing ones or replace. 
-    // For now, let's say selecting new files replaces the existing ones to keep it simple.
-    setPreviews(newPreviews);
+    if (remaining <= 0) {
+      toast.error('Maximum 5 photos allowed');
+      return;
+    }
+
+    const filesToAdd = files.slice(0, remaining);
+    const newPreviews: string[] = [];
+    const newFileMap = new Map(fileMap);
+
+    filesToAdd.forEach(file => {
+      const url = URL.createObjectURL(file);
+      newPreviews.push(url);
+      newFileMap.set(url, file);
+    });
+
+    setPreviews(prev => [...prev, ...newPreviews]);
+    setFileMap(newFileMap);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -258,30 +273,15 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   };
 
   const removeFile = (index: number) => {
-    // We need to find if this preview was a local file or an existing remote image
-    const previewToRemove = previews[index];
-    
-    // Check if it's an object URL (local file)
-    const isLocal = previewToRemove.startsWith('blob:');
-    
-    if (isLocal) {
-      // Find which file it corresponds to
-      // This is tricky if we don't store the mapping. 
-      // Let's assume the order in selectedFiles matches the order of blob: URLs in previews.
-      // Actually, let's just filter both based on the index if we can.
-      
-      // Better approach: filter previews, and if it was a local file, filter selectedFiles too.
-      // Since we always keep them in sync during selection and drag, the relative order of local files
-      // in selectedFiles should match their relative order in previews.
-      
-      const localPreviewsBefore = previews.slice(0, index).filter(p => p.startsWith('blob:'));
-      const fileIndex = localPreviewsBefore.length;
-      
-      setSelectedFiles(prev => prev.filter((_, i) => i !== fileIndex));
-    }
-
+    const urlToRemove = previews[index];
     setPreviews(prev => prev.filter((_, i) => i !== index));
-    URL.revokeObjectURL(previewToRemove);
+    
+    if (urlToRemove.startsWith('blob:')) {
+      const newFileMap = new Map(fileMap);
+      newFileMap.delete(urlToRemove);
+      setFileMap(newFileMap);
+      URL.revokeObjectURL(urlToRemove);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -291,37 +291,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
       setPreviews((items) => {
         const oldIndex = items.indexOf(active.id as string);
         const newIndex = items.indexOf(over.id as string);
-        
-        const newPreviews = arrayMove(items, oldIndex, newIndex);
-        
-        // Also need to sync selectedFiles if any of these were local files
-        // This is complex because selectedFiles only contains NEW files, 
-        // while previews contains both new and existing.
-        
-        // Let's rebuild selectedFiles based on the new order of local previews
-        const newLocalPreviews = newPreviews.filter(p => p.startsWith('blob:'));
-        const newSelectedFiles: File[] = [];
-        
-        newLocalPreviews.forEach(blobUrl => {
-          // Find the file that matches this blobUrl
-          // We can't easily do this unless we stored the mapping.
-          // Let's just use the original mapping before move.
-          
-          // Actually, a simpler way: 
-          // 1. Get all local previews in their OLD order.
-          // 2. Map them to selectedFiles.
-          // 3. Get all local previews in their NEW order.
-          // 4. Reconstruct selectedFiles.
-          
-          const oldLocalPreviews = previews.filter(p => p.startsWith('blob:'));
-          const fileIdx = oldLocalPreviews.indexOf(blobUrl);
-          if (fileIdx !== -1) {
-            newSelectedFiles.push(selectedFiles[fileIdx]);
-          }
-        });
-        
-        setSelectedFiles(newSelectedFiles);
-        return newPreviews;
+        return arrayMove(items, oldIndex, newIndex);
       });
     }
   };
@@ -330,7 +300,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
     setError(null);
     
     // If not editing, require photos
-    if (!editListing && selectedFiles.length === 0) {
+    if (previews.length === 0) {
       setError('Please add at least one photo');
       return;
     }
@@ -354,26 +324,30 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
       if (!session) throw new Error('You must be logged in to post an ad');
 
       // 1. Upload images to Supabase Storage if new ones selected
-      let imageUrls: string[] = editListing?.images || (editListing?.image ? [editListing.image] : []);
+      const finalImageUrls: string[] = [];
       
-      if (selectedFiles.length > 0) {
-        imageUrls = []; // Replace existing if new ones uploaded
-        for (const file of selectedFiles) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `${session.user.id}/${fileName}`;
+      for (const url of previews) {
+        if (url.startsWith('blob:')) {
+          const file = fileMap.get(url);
+          if (file) {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `${session.user.id}/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('listings')
-            .upload(filePath, file);
+            const { error: uploadError } = await supabase.storage
+              .from('listings')
+              .upload(filePath, file);
 
-          if (uploadError) throw uploadError;
-          
-          const { data: urlData } = supabase.storage
-            .from('listings')
-            .getPublicUrl(filePath);
+            if (uploadError) throw uploadError;
             
-          imageUrls.push(urlData.publicUrl);
+            const { data: urlData } = supabase.storage
+              .from('listings')
+              .getPublicUrl(filePath);
+              
+            finalImageUrls.push(urlData.publicUrl);
+          }
+        } else {
+          finalImageUrls.push(url);
         }
       }
 
@@ -402,11 +376,12 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         title: data.title,
         price: price,
         location: data.location,
-        image: imageUrls[0], // Primary thumbnail
-        images: imageUrls,   // All images for gallery
+        image: finalImageUrls[0], // Primary thumbnail
+        images: finalImageUrls,   // All images for gallery
         description: data.description,
         category: categoryName,
         category_id: categoryId,
+        condition: data.condition,
       };
 
       if (editListing) {
@@ -423,8 +398,8 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
         // Reset state
         setSuccess(false);
         if (!editListing) {
-          reset({ title: '', category: '', price: '', location: '', description: '' });
-          setSelectedFiles([]);
+          reset({ title: '', category: '', price: '', location: '', description: '', condition: 'Used' });
+          setFileMap(new Map());
           setPreviews([]);
         }
       }, 2000);
@@ -675,7 +650,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Price */}
                       <div className="relative group">
                         <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black transition-colors text-sm ${errors.price ? 'text-red-500' : 'text-gray-400 group-focus-within:text-orange-500'}`}>Br</span>
@@ -685,6 +660,23 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                           placeholder="Price"
                           className={`w-full pl-10 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-sm ${errors.price ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                         />
+                      </div>
+
+                      {/* Condition */}
+                      <div className="relative group">
+                        <select
+                          {...register('condition')}
+                          className={`w-full px-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold appearance-none cursor-pointer text-sm ${errors.condition ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
+                        >
+                          <option value="Brand New">Brand New</option>
+                          <option value="Slightly Used">Slightly Used</option>
+                          <option value="Used">Used</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       </div>
                     </div>
 

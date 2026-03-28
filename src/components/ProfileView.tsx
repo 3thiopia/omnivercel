@@ -1,9 +1,10 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { User, Phone, Mail, Camera, Loader2, CheckCircle2, AlertCircle, LogOut, ArrowLeft, Trash2, MapPin, ShieldCheck } from 'lucide-react';
+import { User, Phone, Mail, Camera, Loader2, CheckCircle2, AlertCircle, LogOut, ArrowLeft, Trash2, MapPin, ShieldCheck, Info, HelpCircle, FileText } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Link } from 'react-router-dom';
 import { api, UserProfile } from '../services/api';
 import { supabase } from '../lib/supabase';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
@@ -16,6 +17,7 @@ interface ProfileViewProps {
   onLogoutSuccess: () => void;
   onBack: () => void;
   onAdminClick?: () => void;
+  onViewPublicProfile?: (userId: string) => void;
 }
 
 const profileSchema = z.object({
@@ -27,7 +29,7 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminClick }: ProfileViewProps) => {
+export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminClick, onViewPublicProfile }: ProfileViewProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -294,6 +296,26 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
       </div>
 
       <div className="max-w-2xl mx-auto px-4 -mt-10 relative z-10">
+        <div className="mb-6">
+          <button
+            onClick={() => onViewPublicProfile?.(user.id)}
+            className="w-full bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm flex items-center justify-between group hover:border-emerald-500 transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                <User className="w-6 h-6" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-black text-gray-900 tracking-tight">View Public Profile</h3>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">See how others see you</p>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-all">
+              <ArrowLeft className="w-5 h-5 rotate-180" />
+            </div>
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit(handleUpdateProfile)} className="space-y-6">
           {(error || Object.keys(errors).length > 0) && (
             <motion.div 
@@ -468,6 +490,39 @@ export const ProfileView = ({ user, onLogout, onLogoutSuccess, onBack, onAdminCl
             )}
           </button>
         </form>
+
+        {/* Support & Info Section */}
+        <div className="mt-8 p-8 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+              <HelpCircle className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Support & Info</h3>
+          </div>
+          
+          <div className="grid gap-3">
+            {[
+              { label: 'About OmniMarket', to: '/p/about-us', icon: <Info className="w-4 h-4" /> },
+              { label: 'Safety Tips', to: '/p/safety-tips', icon: <ShieldCheck className="w-4 h-4" /> },
+              { label: 'Contact Support', to: '/p/contact-support', icon: <Mail className="w-4 h-4" /> },
+              { label: 'Terms of Service', to: '/p/terms-of-service', icon: <FileText className="w-4 h-4" /> }
+            ].map((item, i) => (
+              <Link 
+                key={i}
+                to={item.to}
+                className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-gray-400 group-hover:text-emerald-500 transition-colors">
+                    {item.icon}
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">{item.label}</span>
+                </div>
+                <ArrowLeft className="w-4 h-4 text-gray-300 rotate-180" />
+              </Link>
+            ))}
+          </div>
+        </div>
 
         {/* Admin Section */}
         {profile?.role === 'admin' && onAdminClick && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, lazy, Suspense, useMemo, useCallback, useRef } from 'react';
-import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { CategoryBar } from './components/CategoryBar';
 import { ListingCard } from './components/ListingCard';
@@ -11,7 +11,7 @@ import { api, Listing, UserProfile } from './services/api';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { ETHIOPIAN_LOCATIONS } from './constants/locations';
-import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2, RefreshCw } from 'lucide-react';
+import { ShieldCheck, Search, PlusCircle, LayoutGrid, List, Settings, LogOut, User, Home, Package, MessageCircle, Filter, ArrowUpDown, X, MapPin, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { getOptimizedImageUrl } from './lib/imageUtils';
 import { ProfileCompletionModal } from './components/ProfileCompletionModal';
@@ -20,27 +20,38 @@ import { ListingSkeleton } from './components/ui/Skeleton';
 import { Meta } from './components/Meta';
 import { useAnalytics } from './hooks/useAnalytics';
 
+import { getProductSlug, getIdFromSlug } from './lib/seoUtils';
+
 // Lazy load heavy components
 const ProductDetail = lazy(() => import('./components/ProductDetail').then(m => ({ default: m.ProductDetail })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const MyListings = lazy(() => import('./components/MyListings').then(m => ({ default: m.MyListings })));
 const ProfileView = lazy(() => import('./components/ProfileView').then(m => ({ default: m.ProfileView })));
 const ChatView = lazy(() => import('./components/ChatView').then(m => ({ default: m.ChatView })));
+const StaticPage = lazy(() => import('./components/StaticPage').then(m => ({ default: m.StaticPage })));
 const SellerProfileView = lazy(() => import('./components/SellerProfileView').then(m => ({ default: m.SellerProfileView })));
 
 function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, setIsPostAdOpen, handleDeleteListing, handleToggleFavorite, handleViewSellerProfile }: any) {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchListing = async () => {
-      if (!id) return;
+      const listingId = id || (slug ? getIdFromSlug(slug) : null);
+      if (!listingId) return;
+      
       setLoading(true);
       try {
-        const data = await api.listings.getById(id);
+        const data = await api.listings.getById(listingId);
         setListing(data);
+        
+        // If accessed via old ID URL, redirect to SEO URL
+        if (id && data) {
+          const newSlug = getProductSlug(data.title, data.id);
+          navigate(`/product/${newSlug}`, { replace: true });
+        }
       } catch (err) {
         console.error('Error fetching listing:', err);
         toast.error('Listing not found');
@@ -49,7 +60,7 @@ function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, s
       }
     };
     fetchListing();
-  }, [id]);
+  }, [id, slug]);
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -70,7 +81,7 @@ function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, s
       <ProductDetail 
         product={listing} 
       onBack={() => navigate(-1)}
-      onViewProduct={(l) => onOpenListing(l.id)}
+      onViewProduct={(l) => onOpenListing(l)}
       onStartChat={onStartChat}
       onEdit={() => {
         setEditingListing(listing);
@@ -101,7 +112,7 @@ function SellerProfileWrapper({ handleOpenListing, handleStartChat }: any) {
     <SellerProfileView 
       sellerId={id} 
       onBack={() => navigate(-1)}
-      onOpenListing={(lid) => handleOpenListing(lid)}
+      onOpenListing={(listing) => handleOpenListing(listing)}
       onContact={(sid) => {
         handleStartChat(sid);
       }}
@@ -314,9 +325,10 @@ export default function App() {
     }
   }, [regionFilter, subRegionFilter]);
 
-  const handleOpenListing = async (id: string | number) => {
-    navigate(`/listing/${id}`);
-  };
+  const handleOpenListing = useCallback(async (listing: Listing) => {
+    const slug = getProductSlug(listing.title, listing.id);
+    navigate(`/product/${slug}`);
+  }, [navigate]);
 
   const handleViewSellerProfile = (sellerId: string) => {
     navigate(`/seller/${sellerId}`);
@@ -886,22 +898,22 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <VirtualListingGrid 
-                        listings={processedListings}
-                        columns={columns}
-                        viewMode={viewMode}
-                        isFetchingNextPage={isFetchingNextPage}
-                        hasNextPage={hasNextPage}
-                        fetchNextPage={fetchNextPage}
-                        handleOpenListing={handleOpenListing}
-                        handleToggleFavorite={handleToggleFavorite}
-                      />
+                        <VirtualListingGrid 
+                          listings={processedListings}
+                          columns={columns}
+                          viewMode={viewMode}
+                          isFetchingNextPage={isFetchingNextPage}
+                          hasNextPage={hasNextPage}
+                          fetchNextPage={fetchNextPage}
+                          handleOpenListing={(l) => handleOpenListing(l)}
+                          handleToggleFavorite={handleToggleFavorite}
+                        />
                     )}
                   </div>
                 </section>
 
                 {/* Why Omni Section */}
-                <section className="px-4 py-16 bg-white rounded-[3rem] my-12 mx-4 border border-gray-100/50 shadow-sm">
+                <section className="hidden md:block px-4 py-16 bg-white rounded-[3rem] my-12 mx-4 border border-gray-100/50 shadow-sm">
                   <div className="text-center max-w-3xl mx-auto mb-16">
                     <h2 className="text-4xl font-black text-gray-900 mb-4">Why Choose OmniMarket?</h2>
                     <p className="text-gray-500 text-lg">We make buying and selling safe, fast and easy for everyone.</p>
@@ -937,6 +949,7 @@ export default function App() {
                 <AdminDashboard 
                   listings={listings} 
                   onBack={() => navigate('/')} 
+                  onViewProduct={(listing: any) => handleOpenListing(listing)}
                 />
               ) : <Navigate to="/" />
             } />
@@ -945,7 +958,7 @@ export default function App() {
                 <MyListings 
                   user={user}
                   onBack={() => navigate('/')}
-                  onViewProduct={(listing) => handleOpenListing(listing.id)}
+                  onViewProduct={(listing: any) => handleOpenListing(listing)}
                 />
               ) : <Navigate to="/" />
             } />
@@ -957,6 +970,7 @@ export default function App() {
                   onLogoutSuccess={handleLogoutSuccess}
                   onBack={() => navigate('/')}
                   onAdminClick={() => navigate('/admin')}
+                  onViewPublicProfile={(userId: string) => navigate(`/seller/${userId}`)}
                 />
               ) : <Navigate to="/" />
             } />
@@ -966,11 +980,34 @@ export default function App() {
                   initialConversationId={pendingConversationId} 
                   onConversationSelected={() => setPendingConversationId(null)}
                   onBack={() => navigate('/')}
+                  onViewProduct={(listing: any) => handleOpenListing(listing)}
                 />
               ) : <Navigate to="/" />
             } />
-            <Route path="/listing/:id" element={<ListingDetailWrapper onOpenListing={handleOpenListing} onStartChat={handleStartChat} setEditingListing={setEditingListing} setIsPostAdOpen={setIsPostAdOpen} handleDeleteListing={handleDeleteListing} handleToggleFavorite={handleToggleFavorite} handleViewSellerProfile={handleViewSellerProfile} />} />
+            <Route path="/listing/:id" element={
+              <ListingDetailWrapper 
+                onOpenListing={(l: Listing) => handleOpenListing(l)}
+                onStartChat={handleStartChat}
+                setEditingListing={setEditingListing}
+                setIsPostAdOpen={setIsPostAdOpen}
+                handleDeleteListing={handleDeleteListing}
+                handleToggleFavorite={handleToggleFavorite}
+                handleViewSellerProfile={handleViewSellerProfile}
+              />
+            } />
+            <Route path="/product/:slug" element={
+              <ListingDetailWrapper 
+                onOpenListing={(l: Listing) => handleOpenListing(l)}
+                onStartChat={handleStartChat}
+                setEditingListing={setEditingListing}
+                setIsPostAdOpen={setIsPostAdOpen}
+                handleDeleteListing={handleDeleteListing}
+                handleToggleFavorite={handleToggleFavorite}
+                handleViewSellerProfile={handleViewSellerProfile}
+              />
+            } />
             <Route path="/seller/:id" element={<SellerProfileWrapper handleOpenListing={handleOpenListing} handleStartChat={handleStartChat} />} />
+            <Route path="/p/:slug" element={<StaticPage />} />
           </Routes>
         </Suspense>
       </main>
@@ -995,10 +1032,10 @@ export default function App() {
           <div>
             <h4 className="font-bold text-xl mb-6">Quick Links</h4>
             <ul className="space-y-4 text-gray-400">
-              <li><a href="#" className="hover:text-emerald-500 transition-colors">About Us</a></li>
-              <li><a href="#" className="hover:text-emerald-500 transition-colors">Contact Support</a></li>
-              <li><a href="#" className="hover:text-emerald-500 transition-colors">Safety Tips</a></li>
-              <li><a href="#" className="hover:text-emerald-500 transition-colors">Terms of Service</a></li>
+              <li><Link to="/p/about-us" className="hover:text-emerald-500 transition-colors">About Us</Link></li>
+              <li><Link to="/p/contact-support" className="hover:text-emerald-500 transition-colors">Contact Support</Link></li>
+              <li><Link to="/p/safety-tips" className="hover:text-emerald-500 transition-colors">Safety Tips</Link></li>
+              <li><Link to="/p/terms-of-service" className="hover:text-emerald-500 transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
           <div>

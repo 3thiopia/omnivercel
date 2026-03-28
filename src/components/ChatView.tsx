@@ -42,9 +42,10 @@ interface ChatViewProps {
   initialConversationId?: string | null;
   onConversationSelected?: () => void;
   onBack?: () => void;
+  onViewProduct?: (listing: { id: string; title: string; [key: string]: any }) => void;
 }
 
-export const ChatView = ({ initialConversationId, onConversationSelected, onBack }: ChatViewProps) => {
+export const ChatView = ({ initialConversationId, onConversationSelected, onBack, onViewProduct }: ChatViewProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -554,7 +555,13 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
               
               {selectedConversation.listing && (
                 <button 
-                  onClick={() => window.location.href = `/listings/${selectedConversation.listing?.id}`}
+                  onClick={() => {
+                    if (onViewProduct) {
+                      onViewProduct(selectedConversation.listing);
+                    } else {
+                      window.location.href = `/listings/${selectedConversation.listing?.id}`;
+                    }
+                  }}
                   className="flex items-center gap-2 md:gap-2.5 px-2 md:px-4 py-1.5 md:py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl md:rounded-2xl border border-gray-100 transition-all group"
                 >
                   <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">

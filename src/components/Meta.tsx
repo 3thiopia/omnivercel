@@ -7,6 +7,7 @@ interface MetaProps {
   image?: string;
   url?: string;
   type?: string;
+  schema?: any;
 }
 
 export const Meta: React.FC<MetaProps> = ({
@@ -15,19 +16,22 @@ export const Meta: React.FC<MetaProps> = ({
   image = 'https://picsum.photos/seed/omnimarket/1200/630',
   url = window.location.href,
   type = 'website',
+  schema,
 }) => {
   const siteName = 'OmniMarket';
-  const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
+  const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;
 
   return (
     <Helmet>
       {/* Standard metadata tags */}
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
+      <link rel="canonical" href={url} />
 
       {/* Open Graph / Facebook */}
       <meta property="og:type" content={type} />
       <meta property="og:url" content={url} />
+      <meta property="og:site_name" content={siteName} />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={image} />
@@ -38,6 +42,13 @@ export const Meta: React.FC<MetaProps> = ({
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={image} />
+
+      {/* Structured Data */}
+      {schema && (
+        <script type="application/ld+json">
+          {JSON.stringify(schema)}
+        </script>
+      )}
     </Helmet>
   );
 };

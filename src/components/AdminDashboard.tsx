@@ -39,6 +39,7 @@ import { ConfirmationModal } from './ConfirmationModal';
 interface AdminDashboardProps {
   listings: Listing[];
   onBack: () => void;
+  onViewProduct: (listing: Listing) => void;
 }
 
 const ICON_MAP: Record<string, any> = {
@@ -48,7 +49,7 @@ const ICON_MAP: Record<string, any> = {
   FolderTree
 };
 
-export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
+export const AdminDashboard = ({ listings, onBack, onViewProduct }: AdminDashboardProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'users' | 'categories' | 'reports' | 'ads'>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [localListings, setLocalListings] = useState<Listing[]>(listings);
@@ -820,6 +821,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                               <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase flex-shrink-0 ${listing.isPromoted ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-500'}`}>
                                 {listing.isPromoted ? 'Promoted' : 'Standard'}
                               </span>
+                              {listing.condition && (
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                  {listing.condition}
+                                </span>
+                              )}
                               {listing.status === 'sold' && (
                                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-red-50 text-red-600">
                                   Sold
@@ -887,7 +893,10 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                             Make Available
                           </button>
                         )}
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 hover:bg-gray-50 rounded-lg text-[10px] font-bold uppercase transition-all">
+                        <button 
+                          onClick={() => onViewProduct(listing)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 hover:bg-gray-50 rounded-lg text-[10px] font-bold uppercase transition-all"
+                        >
                           <ExternalLink className="w-3.5 h-3.5" />
                           View
                         </button>
@@ -943,6 +952,11 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                               <span className={`inline-flex px-2 py-1 rounded-lg text-[10px] font-black uppercase border ${listing.isPromoted ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
                                 {listing.isPromoted ? 'Promoted' : 'Standard'}
                               </span>
+                              {listing.condition && (
+                                <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                  {listing.condition}
+                                </span>
+                              )}
                               {listing.status === 'sold' && (
                                 <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-black uppercase bg-red-50 text-red-600 border border-red-100">
                                   Sold
@@ -1014,7 +1028,10 @@ export const AdminDashboard = ({ listings, onBack }: AdminDashboardProps) => {
                                   <RotateCcw className="w-5 h-5" />
                                 </button>
                               )}
-                              <button className="p-2 text-gray-400 hover:text-emerald-500 transition-all rounded-xl hover:bg-gray-50">
+                              <button 
+                                onClick={() => onViewProduct(listing)}
+                                className="p-2 text-gray-400 hover:text-emerald-500 transition-all rounded-xl hover:bg-gray-50"
+                              >
                                 <ExternalLink className="w-5 h-5" />
                               </button>
                               <button 

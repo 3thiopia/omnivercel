@@ -8,7 +8,7 @@ import { getOptimizedImageUrl } from '../lib/imageUtils';
 interface SellerProfileViewProps {
   sellerId: string;
   onBack: () => void;
-  onOpenListing: (id: string | number) => void;
+  onOpenListing: (listing: Listing) => void;
   onContact: (sellerId: string) => void;
 }
 
@@ -167,7 +167,7 @@ export function SellerProfileView({ sellerId, onBack, onOpenListing, onContact }
                   isFavorited={listing.isFavorited}
                   likesCount={listing.likes_count}
                   postedAt={listing.postedAt}
-                  onClick={() => onOpenListing(listing.id)}
+                  onClick={() => onOpenListing(listing)}
                 />
               ))}
             </div>
