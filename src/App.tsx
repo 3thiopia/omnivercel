@@ -23,7 +23,7 @@ import { useAnalytics } from './hooks/useAnalytics';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { NoConnection } from './components/NoConnection';
 
-import { getProductSlug, getIdFromSlug } from './lib/seoUtils';
+import { getProductSlug, getIdFromSlug, getProductPath } from './lib/seoUtils';
 
 // Lazy load heavy components
 const ProductDetail = lazy(() => import('./components/ProductDetail').then(m => ({ default: m.ProductDetail })));
@@ -35,7 +35,7 @@ const StaticPage = lazy(() => import('./components/StaticPage').then(m => ({ def
 const SellerProfileView = lazy(() => import('./components/SellerProfileView').then(m => ({ default: m.SellerProfileView })));
 
 function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, setIsPostAdOpen, handleDeleteListing, handleUpdateListingStatus, handleToggleFavorite, handleViewSellerProfile, setIsAuthOpen }: any) {
-  const { id, slug } = useParams();
+  const { id, category, slug } = useParams();
   const navigate = useNavigate();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,10 +50,10 @@ function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, s
         const data = await api.listings.getById(listingId);
         setListing(data);
         
-        // If accessed via old ID URL, redirect to SEO URL
-        if (id && data) {
-          const newSlug = getProductSlug(data.title, data.id);
-          navigate(`/product/${newSlug}`, { replace: true });
+        // If accessed via old ID URL or old slug URL without category, redirect to SEO URL
+        if (data && (id || !category)) {
+          const newPath = getProductPath(data.category, data.title, data.id);
+          navigate(newPath, { replace: true });
         }
       } catch (err) {
         console.error('Error fetching listing:', err);
@@ -345,8 +345,8 @@ export default function App() {
   }, [regionFilter, subRegionFilter]);
 
   const handleOpenListing = useCallback(async (listing: Listing) => {
-    const slug = getProductSlug(listing.title, listing.id);
-    navigate(`/product/${slug}`);
+    const path = getProductPath(listing.category, listing.title, listing.id);
+    navigate(path);
   }, [navigate]);
 
   const handleViewSellerProfile = (sellerId: string) => {
@@ -1138,6 +1138,19 @@ export default function App() {
               ) : <Navigate to="/" />
             } />
             <Route path="/listing/:id" element={
+              <ListingDetailWrapper 
+                onOpenListing={(l: Listing) => handleOpenListing(l)}
+                onStartChat={handleStartChat}
+                setEditingListing={setEditingListing}
+                setIsPostAdOpen={setIsPostAdOpen}
+                handleDeleteListing={handleDeleteListing}
+                handleUpdateListingStatus={handleUpdateListingStatus}
+                handleToggleFavorite={handleToggleFavorite}
+                handleViewSellerProfile={handleViewSellerProfile}
+                setIsAuthOpen={setIsAuthOpen}
+              />
+            } />
+            <Route path="/product/:category/:slug" element={
               <ListingDetailWrapper 
                 onOpenListing={(l: Listing) => handleOpenListing(l)}
                 onStartChat={handleStartChat}

@@ -47,7 +47,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         onClick={onClick}
-        className="bg-white rounded-2xl overflow-hidden border border-gray-100/50 shadow-sm hover:shadow-xl transition-all group cursor-pointer relative"
+        className="bg-white rounded-2xl overflow-hidden border border-gray-100/50 shadow-sm hover:shadow-xl transition-all group cursor-pointer relative h-full flex flex-col"
       >
         <div className="relative aspect-[4/3] overflow-hidden">
           <LazyImage 
@@ -63,15 +63,17 @@ export const ListingCard = React.memo(({ title, price, location, image, category
             </div>
           )}
         </div>
-        <div className="p-2 sm:p-4">
-          {category && (
-            <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5 sm:mb-1">
-              <span>{categoryIcon}</span>
-              <span className="truncate">{category}</span>
-            </div>
-          )}
+        <div className="p-2 sm:p-4 flex flex-col flex-1 min-h-0">
+          <div className="h-[12px] sm:h-[16px] mb-0.5 sm:mb-1 overflow-hidden">
+            {category && (
+              <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                <span>{categoryIcon}</span>
+                <span className="truncate">{category}</span>
+              </div>
+            )}
+          </div>
           <div className="flex justify-between items-start gap-2 mb-1 sm:mb-2">
-            <h3 className="font-bold text-gray-800 text-xs sm:text-base line-clamp-2 group-hover:text-emerald-600 transition-colors leading-tight flex-1">
+            <h3 className="font-bold text-gray-800 text-xs sm:text-base line-clamp-2 break-all h-[1.8rem] sm:h-[2.4rem] overflow-hidden group-hover:text-emerald-600 transition-colors leading-[1.2] flex-1 min-w-0 m-0 p-0">
               {title}
             </h3>
             <button 
@@ -92,27 +94,29 @@ export const ListingCard = React.memo(({ title, price, location, image, category
               )}
             </button>
           </div>
-          <div className="flex flex-col gap-0.5 sm:gap-1">
+          <div className="flex flex-col gap-0.5 sm:gap-1 mt-auto">
             <span className="text-sm sm:text-xl font-black text-emerald-600">
               Br {price.toLocaleString()}
             </span>
-            <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-xs mt-0.5">
-              <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
+            <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-xs mt-0.5 h-[14px] sm:h-[16px] overflow-hidden">
+              <MapPin className="w-2.5 h-2.5 sm:w-3 h-3 shrink-0" />
               <span className="truncate">{location}</span>
             </div>
-            {timeAgo && (
-              <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[10px] mt-0.5">
-                <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
-                <span>{timeAgo}</span>
-              </div>
-            )}
-            {condition && (
-              <div className="mt-1">
-                <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+            <div className="h-[12px] sm:h-[14px] mt-0.5 overflow-hidden">
+              {timeAgo && (
+                <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[10px]">
+                  <Clock className="w-2 h-2 sm:w-2.5 h-2.5 shrink-0" />
+                  <span>{timeAgo}</span>
+                </div>
+              )}
+            </div>
+            <div className="h-[16px] sm:h-[20px] mt-1 overflow-hidden">
+              {condition && (
+                <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider inline-block">
                   {condition}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </motion.div>
@@ -150,7 +154,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
             </div>
           )}
           <div className="flex justify-between items-start gap-2">
-            <h3 className="font-bold text-gray-800 text-sm sm:text-lg line-clamp-1 group-hover:text-emerald-600 transition-colors flex-1">
+            <h3 className="font-bold text-gray-800 text-sm sm:text-lg line-clamp-1 break-all group-hover:text-emerald-600 transition-colors flex-1">
               {title}
             </h3>
             <button 

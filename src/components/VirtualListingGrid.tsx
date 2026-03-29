@@ -68,7 +68,7 @@ export const VirtualListingGrid: React.FC<VirtualListingGridProps> = ({
       
       if (listing) {
         items.push(
-          <div key={listing.id} className="flex-1 px-2">
+          <div key={listing.id} className="flex-1 px-2 flex flex-col">
             <ComponentErrorBoundary>
               <ListingCard 
                 title={listing.title}

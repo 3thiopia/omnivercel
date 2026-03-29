@@ -20,7 +20,7 @@ export interface Listing {
   sellerName?: string;
   seller_id?: string;
   postedAt?: string;
-  status?: 'active' | 'sold' | 'pending' | 'hidden' | 'deleted';
+  status?: 'active' | 'sold' | 'pending' | 'hidden' | 'deleted' | 'draft';
   views?: number;
   likes_count?: number;
   isFavorited?: boolean;

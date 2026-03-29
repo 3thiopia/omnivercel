@@ -37,7 +37,7 @@ import { LazyImage } from './LazyImage';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
 import { Meta } from './Meta';
-import { getProductSlug } from '../lib/seoUtils';
+import { getProductSlug, getProductPath } from '../lib/seoUtils';
 
 interface ProductDetailProps {
   product: Listing;
@@ -379,7 +379,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
     : 0;
 
-  const productUrl = `${window.location.origin}/product/${getProductSlug(product.title, product.id)}`;
+  const productUrl = `${window.location.origin}${getProductPath(product.category, product.title, product.id)}`;
   
   const productSchema = {
     "@context": "https://schema.org/",
@@ -602,7 +602,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
               </div>
               
               <div className="space-y-2">
-                <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-tight">
+                <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-tight line-clamp-3 break-words">
                   {product.title}
                 </h1>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-gray-500 text-sm font-medium">

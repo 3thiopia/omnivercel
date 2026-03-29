@@ -402,7 +402,7 @@ export const api = {
           condition: listing.condition,
           attributes: listing.attributes || {},
           seller_id: session.user.id,
-          status: 'active'
+          status: listing.status || 'active'
         }])
         .select()
         .single();

@@ -702,6 +702,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                       <input
                         type="text"
                         {...register('title')}
+                        maxLength={100}
                         placeholder="Ad Title (e.g. iPhone 15 Pro Max)"
                         className={`w-full pl-12 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-base sm:text-sm ${errors.title ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                       />

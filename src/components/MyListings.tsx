@@ -322,7 +322,7 @@ export const MyListings = ({ user, onBack, onViewProduct }: MyListingsProps) => 
                   <div className="flex-1 p-5 lg:p-6 flex flex-col">
                     <div className="flex justify-between items-start mb-3">
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-black text-gray-900 text-lg lg:text-xl truncate leading-tight mb-1 group-hover:text-emerald-600 transition-colors">
+                        <h3 className="font-black text-gray-900 text-lg lg:text-xl line-clamp-2 break-all h-[2.7rem] lg:h-[3rem] overflow-hidden leading-[1.2] mb-1 group-hover:text-emerald-600 transition-colors m-0 p-0">
                           {listing.title}
                         </h3>
                         <div className="flex items-baseline gap-1">

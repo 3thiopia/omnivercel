@@ -22,6 +22,15 @@ export const getProductSlug = (title: string, id: string | number): string => {
 };
 
 /**
+ * Generates the full SEO path for a product including category.
+ */
+export const getProductPath = (category: string | undefined, title: string, id: string | number): string => {
+  const categorySlug = category ? slugify(category) : 'item';
+  const productSlug = getProductSlug(title, id);
+  return `/product/${categorySlug}/${productSlug}`;
+};
+
+/**
  * Extracts the ID from a product slug.
  */
 export const getIdFromSlug = (slug: string): string | null => {
