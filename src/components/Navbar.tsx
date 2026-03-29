@@ -7,9 +7,7 @@ export const Navbar = () => {
         <div className="flex justify-between items-center h-16 gap-4">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center gap-2">
-            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">O</span>
-            </div>
+            <img src="/logo.png" alt="OmniMarket Logo" className="w-10 h-10 object-contain" />
             <span className="text-2xl font-bold tracking-tight text-gray-900 hidden sm:block">
               Omni<span className="text-emerald-500">Market</span>
             </span>

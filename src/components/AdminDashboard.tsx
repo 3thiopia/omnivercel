@@ -47,6 +47,7 @@ import {
   Line
 } from 'recharts';
 import { getOptimizedImageUrl } from '../lib/imageUtils';
+import { LazyImage } from './LazyImage';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { Listing, User } from '../types';
@@ -920,7 +921,7 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
                   {filteredListings.map((listing) => (
                     <div key={listing.id} className="p-4 space-y-4">
                       <div className="flex items-center gap-3">
-                        <img src={listing.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                        <LazyImage src={listing.image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="flex justify-between items-start">
                             <p className="text-sm font-bold text-gray-900 truncate pr-2">{listing.title}</p>
@@ -2181,7 +2182,7 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
                     {filteredAdsListings.slice(0, 10).map(listing => (
                       <div key={listing.id} className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                          <img src={listing.image} alt="" className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                          <LazyImage src={listing.image} alt="" className="w-12 h-12 rounded-xl object-cover shadow-sm" />
                           <div className="min-w-0">
                             <p className="text-sm font-black text-gray-900 truncate">{listing.title}</p>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{listing.sellerName || 'Verified Seller'}</p>
@@ -2216,7 +2217,7 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
                           <tr key={listing.id} className="hover:bg-gray-50/50 transition-colors group">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <img src={listing.image} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
+                                <LazyImage src={listing.image} alt="" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
                                 <p className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{listing.title}</p>
                               </div>
                             </td>
@@ -2419,7 +2420,7 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
             </div>
             <div className="p-6 space-y-6">
               <div className="flex items-center gap-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                <img src={adModal.listing?.image} alt="" className="w-16 h-16 rounded-xl object-cover shadow-sm" />
+                <LazyImage src={adModal.listing?.image} alt="" className="w-16 h-16 rounded-xl object-cover shadow-sm" />
                 <div>
                   <p className="font-bold text-gray-900 line-clamp-1">{adModal.listing?.title}</p>
                   <p className="text-emerald-600 font-black">Br {adModal.listing?.price.toLocaleString()}</p>

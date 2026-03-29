@@ -20,6 +20,8 @@ import { VirtualListingGrid } from './components/VirtualListingGrid';
 import { ListingSkeleton } from './components/ui/Skeleton';
 import { Meta } from './components/Meta';
 import { useAnalytics } from './hooks/useAnalytics';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { NoConnection } from './components/NoConnection';
 
 import { getProductSlug, getIdFromSlug } from './lib/seoUtils';
 
@@ -153,6 +155,7 @@ function useWindowSize() {
 
 export default function App() {
   useAnalytics();
+  const isOnline = useOnlineStatus();
   const [isPostAdOpen, setIsPostAdOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -529,6 +532,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen bg-gray-50 font-sans ${activeTab === 'messages' ? 'pb-0' : 'pb-20'} lg:pb-0`}>
+      {!isOnline && <NoConnection />}
       <Toaster position="top-right" />
       {!isFullScreenPage && (
         <nav className="hidden lg:block sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">

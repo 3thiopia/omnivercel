@@ -1437,7 +1437,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                       </button>
                     </div>
                     <TransformComponent wrapperClass="!w-full !h-full" contentClass="!w-full !h-full flex items-center justify-center">
-                      <img
+                      <LazyImage
                         src={activeImage}
                         alt="Zoomed product"
                         className="max-w-full max-h-full object-contain"

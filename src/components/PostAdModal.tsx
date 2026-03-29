@@ -27,6 +27,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../lib/supabase';
 import { api, Listing } from '../services/api';
+import { LazyImage } from './LazyImage';
 
 interface PostAdModalProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ const SortablePhoto = ({ url, index, onRemove }: { url: string, index: number, o
       style={style} 
       className={`relative aspect-square rounded-2xl overflow-hidden group shadow-sm ${isDragging ? 'opacity-50' : ''}`}
     >
-      <img src={url} alt="Preview" className="w-full h-full object-cover" />
+      <LazyImage src={url} alt="Preview" className="w-full h-full object-cover" />
       
       {/* Drag Handle Overlay */}
       <div 
@@ -432,7 +433,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4">
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -441,10 +442,11 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-white w-full sm:max-w-2xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[95vh]"
+            initial={{ opacity: 0, y: '100%' }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="relative bg-white w-full sm:max-w-2xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[95vh] pb-[env(safe-area-inset-bottom)]"
           >
           {/* Header */}
           <div className="p-5 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
@@ -701,7 +703,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                         type="text"
                         {...register('title')}
                         placeholder="Ad Title (e.g. iPhone 15 Pro Max)"
-                        className={`w-full pl-12 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-sm ${errors.title ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
+                        className={`w-full pl-12 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-base sm:text-sm ${errors.title ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                       />
                     </div>
 
@@ -713,7 +715,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                           type="number"
                           {...register('price')}
                           placeholder="Price"
-                          className={`w-full pl-10 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-sm ${errors.price ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
+                          className={`w-full pl-10 pr-4 py-4 bg-gray-50 border-2 rounded-2xl outline-none transition-all font-semibold text-base sm:text-sm ${errors.price ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                         />
                       </div>
 
@@ -747,7 +749,7 @@ export const PostAdModal = ({ isOpen, onClose, onSuccess, editListing }: PostAdM
                       {...register('description')}
                       placeholder="Tell buyers more about your item..."
                       rows={4}
-                      className={`w-full p-5 bg-gray-50 border-2 rounded-[2rem] outline-none transition-all font-semibold text-sm resize-none ${errors.description ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
+                      className={`w-full p-5 bg-gray-50 border-2 rounded-[2rem] outline-none transition-all font-semibold text-base sm:text-sm resize-none ${errors.description ? 'border-red-500 bg-red-50' : 'border-transparent focus:border-orange-500 focus:bg-white'}`}
                     />
                   </div>
                 </div>

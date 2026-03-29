@@ -15,7 +15,7 @@ interface BottomNavProps {
 
 export const BottomNav = ({ onHome, onItems, onSell, onProfile, onMessages, activeTab, unreadCount = 0, userProfile }: BottomNavProps) => {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 z-[60] flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 px-6 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] z-[60] flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
       <button 
         onClick={onHome}
         aria-label="Go to home"
