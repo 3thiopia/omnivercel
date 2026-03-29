@@ -72,7 +72,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
               </div>
             )}
           </div>
-          <div className="flex justify-between items-start gap-2 mb-1 sm:mb-2">
+          <div className="flex justify-between items-start gap-2 mb-0.5 sm:mb-2">
             <h3 className="font-bold text-gray-800 text-xs sm:text-base line-clamp-2 break-all h-[1.8rem] sm:h-[2.4rem] overflow-hidden group-hover:text-emerald-600 transition-colors leading-[1.2] flex-1 min-w-0 m-0 p-0">
               {title}
             </h3>
@@ -94,15 +94,15 @@ export const ListingCard = React.memo(({ title, price, location, image, category
               )}
             </button>
           </div>
-          <div className="flex flex-col gap-0.5 sm:gap-1 mt-auto">
+          <div className="flex flex-col gap-0.5 sm:gap-1 mt-1 sm:mt-2">
             <span className="text-sm sm:text-xl font-black text-emerald-600">
               Br {price.toLocaleString()}
             </span>
-            <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-xs mt-0.5 h-[14px] sm:h-[16px] overflow-hidden">
+            <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-xs mt-0 sm:mt-0.5">
               <MapPin className="w-2.5 h-2.5 sm:w-3 h-3 shrink-0" />
               <span className="truncate">{location}</span>
             </div>
-            <div className="h-[12px] sm:h-[14px] mt-0.5 overflow-hidden">
+            <div className="mt-0.5">
               {timeAgo && (
                 <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[10px]">
                   <Clock className="w-2 h-2 sm:w-2.5 h-2.5 shrink-0" />
@@ -110,7 +110,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 </div>
               )}
             </div>
-            <div className="h-[16px] sm:h-[20px] mt-1 overflow-hidden">
+            <div className="mt-0.5 sm:mt-1">
               {condition && (
                 <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider inline-block">
                   {condition}
@@ -129,7 +129,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true }}
       onClick={onClick}
-      className="bg-white rounded-2xl overflow-hidden border border-gray-100/50 shadow-sm hover:shadow-md transition-all group cursor-pointer flex h-32"
+      className="bg-white rounded-2xl overflow-hidden border border-gray-100/50 shadow-sm hover:shadow-md transition-all group cursor-pointer flex h-36 sm:h-40"
     >
       <div className="relative w-32 sm:w-48 overflow-hidden flex-shrink-0">
         <LazyImage 
@@ -145,7 +145,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
           </div>
         )}
       </div>
-      <div className="p-3 sm:p-4 flex flex-col justify-between flex-1 min-w-0">
+      <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1 min-w-0">
         <div>
           {category && (
             <div className="flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5 sm:mb-1">
@@ -175,25 +175,27 @@ export const ListingCard = React.memo(({ title, price, location, image, category
               )}
             </button>
           </div>
-          <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 uppercase font-bold tracking-wider">
-            <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
-            <span className="truncate">{location}</span>
-          </div>
-          {timeAgo && (
-            <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[9px] mt-0.5 font-medium">
-              <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
-              <span>{timeAgo}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 sm:mt-2">
+            <div className="flex items-center gap-1 text-gray-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">
+              <MapPin className="w-2.5 h-2.5 sm:w-3 h-3" />
+              <span className="truncate max-w-[80px] sm:max-w-none">{location}</span>
             </div>
-          )}
+            {timeAgo && (
+              <div className="flex items-center gap-1 text-gray-400 text-[8px] sm:text-[9px] font-medium">
+                <Clock className="w-2 h-2 sm:w-2.5 h-2.5" />
+                <span>{timeAgo}</span>
+              </div>
+            )}
+          </div>
           {condition && (
-            <div className="mt-1">
+            <div className="mt-1.5">
               <span className="text-[8px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
                 {condition}
               </span>
             </div>
           )}
         </div>
-        <div className="flex justify-between items-end">
+        <div className="flex justify-between items-end mt-auto">
           <span className="text-base sm:text-xl font-black text-emerald-600">
             Br {price.toLocaleString()}
           </span>

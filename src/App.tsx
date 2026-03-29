@@ -179,6 +179,13 @@ export default function App() {
   const [regionFilter, setRegionFilter] = useState<string>('');
   const [subRegionFilter, setSubRegionFilter] = useState<string>('');
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+
+  // Draft states for the filter pane
+  const [draftMinPrice, setDraftMinPrice] = useState<string>('');
+  const [draftMaxPrice, setDraftMaxPrice] = useState<string>('');
+  const [draftRegionFilter, setDraftRegionFilter] = useState<string>('');
+  const [draftSubRegionFilter, setDraftSubRegionFilter] = useState<string>('');
+  const [draftSelectedAttributes, setDraftSelectedAttributes] = useState<Record<string, string>>({});
   const [isDeletingListing, setIsDeletingListing] = useState<string | number | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
@@ -334,15 +341,57 @@ export default function App() {
   }, [activeTab]);
 
   // Update location filter when region or sub-region changes
+  // Sync draft states when filter pane opens
   useEffect(() => {
-    if (subRegionFilter) {
-      setLocationFilter(subRegionFilter);
-    } else if (regionFilter) {
-      setLocationFilter(regionFilter);
+    if (isFilterOpen) {
+      setDraftMinPrice(minPrice);
+      setDraftMaxPrice(maxPrice);
+      setDraftRegionFilter(regionFilter);
+      setDraftSubRegionFilter(subRegionFilter);
+      setDraftSelectedAttributes(selectedAttributes);
+    }
+  }, [isFilterOpen]);
+
+  const applyFilters = () => {
+    setMinPrice(draftMinPrice);
+    setMaxPrice(draftMaxPrice);
+    setRegionFilter(draftRegionFilter);
+    setSubRegionFilter(draftSubRegionFilter);
+    setSelectedAttributes(draftSelectedAttributes);
+    
+    // Update location filter string
+    if (draftSubRegionFilter) {
+      setLocationFilter(draftSubRegionFilter);
+    } else if (draftRegionFilter) {
+      setLocationFilter(draftRegionFilter);
     } else {
       setLocationFilter('');
     }
-  }, [regionFilter, subRegionFilter]);
+    
+    setIsFilterOpen(false);
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setMinPrice('');
+    setMaxPrice('');
+    setLocationFilter('');
+    setRegionFilter('');
+    setSubRegionFilter('');
+    setSelectedCategory(null);
+    setSelectedAttributes({});
+    setSortBy('created_at');
+    setSortOrder('desc');
+    
+    // Also clear drafts
+    setDraftMinPrice('');
+    setDraftMaxPrice('');
+    setDraftRegionFilter('');
+    setDraftSubRegionFilter('');
+    setDraftSelectedAttributes({});
+    
+    setTimeout(() => refetchListings(), 0);
+  };
 
   const handleOpenListing = useCallback(async (listing: Listing) => {
     const path = getProductPath(listing.category, listing.title, listing.id);
@@ -776,19 +825,7 @@ export default function App() {
                       )}
 
                       <button 
-                        onClick={() => {
-                          setSearchQuery('');
-                          setMinPrice('');
-                          setMaxPrice('');
-                          setLocationFilter('');
-                          setRegionFilter('');
-                          setSubRegionFilter('');
-                          setSelectedCategory(null);
-                          setSelectedAttributes({});
-                          setSortBy('created_at');
-                          setSortOrder('desc');
-                          setTimeout(() => refetchListings(), 0);
-                        }}
+                        onClick={clearAllFilters}
                         className="bg-gray-900 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-gray-800 transition-all flex items-center gap-1.5 shadow-lg shadow-gray-900/10 active:scale-95"
                       >
                         <RotateCcw className="w-3 h-3" />
@@ -835,16 +872,16 @@ export default function App() {
                               <input 
                                 type="number" 
                                 placeholder="Min"
-                                value={minPrice}
-                                onChange={(e) => setMinPrice(e.target.value)}
+                                value={draftMinPrice}
+                                onChange={(e) => setDraftMinPrice(e.target.value)}
                                 className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                               />
                               <span className="text-gray-300">-</span>
                               <input 
                                 type="number" 
                                 placeholder="Max"
-                                value={maxPrice}
-                                onChange={(e) => setMaxPrice(e.target.value)}
+                                value={draftMaxPrice}
+                                onChange={(e) => setDraftMaxPrice(e.target.value)}
                                 className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                               />
                             </div>
@@ -856,10 +893,10 @@ export default function App() {
                             <div className="space-y-2">
                               <div className="relative">
                                 <select 
-                                  value={regionFilter}
+                                  value={draftRegionFilter}
                                   onChange={(e) => {
-                                    setRegionFilter(e.target.value);
-                                    setSubRegionFilter('');
+                                    setDraftRegionFilter(e.target.value);
+                                    setDraftSubRegionFilter('');
                                   }}
                                   className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none cursor-pointer"
                                 >
@@ -870,15 +907,15 @@ export default function App() {
                                 </select>
                               </div>
                               
-                              {regionFilter && ETHIOPIAN_LOCATIONS.find(l => l.name === regionFilter)?.subRegions && (
+                              {draftRegionFilter && ETHIOPIAN_LOCATIONS.find(l => l.name === draftRegionFilter)?.subRegions && (
                                 <div className="relative">
                                   <select 
-                                    value={subRegionFilter}
-                                    onChange={(e) => setSubRegionFilter(e.target.value)}
+                                    value={draftSubRegionFilter}
+                                    onChange={(e) => setDraftSubRegionFilter(e.target.value)}
                                     className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none cursor-pointer"
                                   >
                                     <option value="">All Sub-Regions</option>
-                                    {ETHIOPIAN_LOCATIONS.find(l => l.name === regionFilter)?.subRegions?.map(sub => (
+                                    {ETHIOPIAN_LOCATIONS.find(l => l.name === draftRegionFilter)?.subRegions?.map(sub => (
                                       <option key={sub} value={sub}>{sub}</option>
                                     ))}
                                   </select>
@@ -907,8 +944,8 @@ export default function App() {
                                   <div key={attr.id} className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{attr.label}</label>
                                     <select
-                                      value={selectedAttributes[attr.id] || ''}
-                                      onChange={(e) => setSelectedAttributes(prev => ({ ...prev, [attr.id]: e.target.value }))}
+                                      value={draftSelectedAttributes[attr.id] || ''}
+                                      onChange={(e) => setDraftSelectedAttributes(prev => ({ ...prev, [attr.id]: e.target.value }))}
                                       className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none cursor-pointer"
                                     >
                                       <option value="">All {attr.label}s</option>
@@ -926,25 +963,18 @@ export default function App() {
                           <div className="sm:col-span-3 flex justify-end gap-2 pt-2 border-t border-gray-50">
                             <button 
                               onClick={() => {
-                                setMinPrice('');
-                                setMaxPrice('');
-                                setLocationFilter('');
-                                setRegionFilter('');
-                                setSubRegionFilter('');
-                                setSelectedCategory(null);
-                                setSelectedAttributes({});
-                                setSortBy('created_at');
-                                setSortOrder('desc');
+                                setDraftMinPrice('');
+                                setDraftMaxPrice('');
+                                setDraftRegionFilter('');
+                                setDraftSubRegionFilter('');
+                                setDraftSelectedAttributes({});
                               }}
                               className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
                             >
                               Reset All
                             </button>
                             <button 
-                              onClick={() => {
-                                refetchListings();
-                                setIsFilterOpen(false);
-                              }}
+                              onClick={applyFilters}
                               className="bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
                             >
                               Apply Filters
@@ -1036,11 +1066,7 @@ export default function App() {
                         </div>
                         <p className="text-gray-500 font-medium">No listings found. Be the first to sell!</p>
                         <button 
-                          onClick={() => {
-                            setSelectedCategory('');
-                            setSearchQuery('');
-                            setLocationFilter('');
-                          }}
+                          onClick={clearAllFilters}
                           className="mt-4 text-emerald-600 font-bold hover:underline"
                         >
                           Clear all filters

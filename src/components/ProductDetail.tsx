@@ -427,40 +427,40 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         schema={productSchema}
       />
       {/* Header - Floating/Sticky */}
-      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between ${
+      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between h-14 sm:h-16 ${
         isScrolled 
-          ? 'bg-white shadow-sm py-3' 
-          : 'bg-white lg:bg-transparent pt-3 lg:pt-8 pb-3'
+          ? 'bg-white/80 backdrop-blur-xl border-b border-gray-100 py-3' 
+          : 'bg-transparent pt-3 lg:pt-8 pb-3'
       }`}>
         <button 
           onClick={onBack}
-          className={`p-2 rounded-full transition-all ${
+          className={`p-2.5 rounded-full transition-all active:scale-90 ${
             isScrolled 
               ? 'bg-gray-100 text-gray-900' 
-              : 'bg-gray-100 text-gray-900 lg:bg-black/20 lg:backdrop-blur-md lg:text-white'
+              : 'bg-black/20 backdrop-blur-md text-white'
           }`}
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <div className="flex gap-2">
+        <div className="flex gap-2.5">
           <button 
             onClick={() => setIsShareModalOpen(true)}
-            className={`p-2 rounded-full transition-all ${
+            className={`p-2.5 rounded-full transition-all active:scale-90 ${
               isScrolled 
                 ? 'bg-gray-100 text-gray-600' 
-                : 'bg-gray-100 text-gray-600 lg:bg-black/20 lg:backdrop-blur-md lg:text-white'
+                : 'bg-black/20 backdrop-blur-md text-white'
             }`}
           >
             <Share2 className="w-5 h-5" />
           </button>
           <button 
             onClick={() => onFavorite?.(product.id)}
-            className={`p-2 rounded-full transition-all flex items-center gap-1.5 ${
+            className={`p-2.5 rounded-full transition-all flex items-center gap-1.5 active:scale-90 ${
               isScrolled 
                 ? (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600 hover:text-red-500') 
                 : (product.isFavorited 
                     ? 'bg-red-50 text-red-500' 
-                    : 'bg-gray-100 text-gray-600 lg:bg-black/20 lg:backdrop-blur-md lg:text-white hover:text-red-500')
+                    : 'bg-black/20 backdrop-blur-md text-white hover:text-red-500')
             }`}
           >
             <Heart className={`w-5 h-5 ${product.isFavorited ? 'fill-current' : ''}`} />
@@ -471,7 +471,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-16 lg:pt-6 lg:px-4 grid lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto lg:pt-6 lg:px-4 grid lg:grid-cols-3 gap-0 lg:gap-8 overflow-x-hidden">
         {/* Breadcrumbs */}
         <nav className="lg:col-span-3 flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest px-4 lg:px-0">
           <button onClick={onBack} className="hover:text-emerald-500 flex items-center gap-1 transition-colors">
@@ -483,18 +483,18 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             {product.category_data?.name || product.category || 'Category'}
           </span>
           <ChevronRight className="w-3 h-3" />
-          <span className="text-gray-900 truncate max-w-[150px] sm:max-w-none">
+          <span className="text-gray-900 truncate max-w-[150px] sm:max-w-none break-all sm:break-words lg:break-normal">
             {product.title}
           </span>
         </nav>
 
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-0 lg:space-y-6 min-w-0">
           {/* Image Gallery */}
-          <div className="relative lg:rounded-3xl overflow-hidden bg-gray-200">
+          <div className="relative lg:rounded-3xl overflow-hidden bg-gray-200 lg:shadow-sm">
             {/* Desktop Main Image */}
             <div 
-              className="aspect-[4/3] hidden lg:block cursor-zoom-in group"
+              className="aspect-[4/3] hidden lg:block cursor-zoom-in group relative"
               onClick={() => setIsZoomOpen(true)}
             >
               <LazyImage 
@@ -581,7 +581,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           )}
 
           {/* Product Info Card */}
-          <div className="bg-white lg:rounded-3xl p-6 lg:shadow-sm space-y-6">
+          <div className="bg-white lg:rounded-3xl p-5 sm:p-6 lg:shadow-sm space-y-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -601,11 +601,11 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 </span>
               </div>
               
-              <div className="space-y-2">
-                <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-tight line-clamp-3 break-words">
+              <div className="space-y-1 sm:space-y-3">
+                <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-[1.2] mb-2 sm:mb-4 break-all sm:break-words lg:break-normal">
                   {product.title}
                 </h1>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-gray-500 text-sm font-medium">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:gap-y-2 text-gray-500 text-sm font-medium">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-emerald-500" />
                     {product.location}
@@ -619,8 +619,8 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <div className="text-4xl font-black text-emerald-600">
+              <div className="flex items-center justify-between pt-6 border-t border-gray-50 mt-4">
+                <div className="text-3xl sm:text-4xl font-black text-emerald-600">
                   Br{product.price.toLocaleString()}
                 </div>
                 <div className="hidden lg:flex gap-3">
@@ -666,8 +666,8 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             <div className="h-[1px] bg-gray-100" />
 
             {/* Description */}
-            <div className="space-y-3">
-              <h2 className="text-lg font-bold text-gray-900">{product.title} for sale in Ethiopia</h2>
+            <div className="space-y-3 lg:space-y-4">
+              <h2 className="text-lg font-bold text-gray-900 leading-[1.2] mb-2 break-all sm:break-words lg:break-normal">{product.title} for sale in Ethiopia</h2>
               <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
                 {product.description || "No description provided."}
               </p>
@@ -1304,7 +1304,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       <div className="max-w-7xl mx-auto px-4 py-12 border-t border-gray-100 mt-12">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight break-all sm:break-words lg:break-normal">
               {relatedItems.some(item => item.title.toLowerCase().includes(product.title.split(' ')[0].toLowerCase())) 
                 ? `More like this ${product.title.split(' ')[0]}` 
                 : 'Related Products'}
@@ -1351,8 +1351,8 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
       <div className="max-w-7xl mx-auto px-4 py-16 border-t border-gray-100 space-y-12">
         <div className="grid md:grid-cols-2 gap-12">
           <div className="space-y-4">
-            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Market Insights: {product.title} Price in Ethiopia</h3>
-            <p className="text-gray-600 leading-relaxed">
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight break-all sm:break-words lg:break-normal">Market Insights: {product.title} Price in Ethiopia</h3>
+            <p className="text-gray-600 leading-relaxed break-all sm:break-words lg:break-normal">
               The average price of <strong>{product.title}</strong> in Ethiopia typically ranges between 
               {" "}<strong>Br{(product.price * 0.8).toLocaleString()}</strong> and 
               {" "}<strong>Br{(product.price * 1.2).toLocaleString()}</strong> ETB depending on the condition and location. 
@@ -1360,7 +1360,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
             </p>
             <div className="flex flex-wrap gap-2 pt-2">
               {[`${product.title} used Ethiopia`, `cheap ${product.title} Addis Ababa`, `${product.title} for sale Ethiopia`, `buy ${product.title} online Ethiopia`].map(keyword => (
-                <span key={keyword} className="px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                <span key={keyword} className="px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full uppercase tracking-wider break-all sm:break-words lg:break-normal">
                   {keyword}
                 </span>
               ))}
@@ -1385,6 +1385,26 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
           </div>
         </div>
       </div>
+
+      {/* Sticky Bottom Bar for Mobile */}
+      {!isOwner && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-gray-100 p-4 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+          <button 
+            onClick={handleContactClick}
+            className="flex-1 bg-emerald-500 text-white h-12 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
+          >
+            <PhoneCall className="w-5 h-5" />
+            Call
+          </button>
+          <button 
+            onClick={handleStartChat}
+            className="flex-1 bg-gray-900 text-white h-12 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-black/10"
+          >
+            <MessageCircle className="w-5 h-5" />
+            Chat
+          </button>
+        </div>
+      )}
 
       {/* Image Zoom Modal */}
       <AnimatePresence>
