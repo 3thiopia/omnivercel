@@ -735,6 +735,10 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
                           <span className="w-3 h-3 rounded-full bg-blue-500"></span>
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Users</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reports</span>
+                        </div>
                       </div>
                     </div>
                     <div className="h-[300px] w-full">
@@ -749,7 +753,11 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
                               <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
                               <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                             </linearGradient>
-                          </defs>
+                            <linearGradient id="colorReports" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis 
                             dataKey="name" 
@@ -788,7 +796,15 @@ export const AdminDashboard = ({ listings, onBack, onViewProduct, onEditListing 
                             fillOpacity={1} 
                             fill="url(#colorUsers)" 
                           />
-                        </AreaChart>
+                          <Area 
+                          type="monotone" 
+                          dataKey="reports" 
+                          stroke="#ef4444" 
+                          strokeWidth={4}
+                          fillOpacity={1} 
+                          fill="url(#colorReports)" 
+                        />
+                      </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   </div>

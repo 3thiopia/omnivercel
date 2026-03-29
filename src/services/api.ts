@@ -520,16 +520,52 @@ export const api = {
   },
   stats: {
     getAll: async (): Promise<Stat[]> => {
-      const { count: listingsCount } = await supabase.from('listings').select('*', { count: 'exact', head: true });
-      const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-      const { count: reportsCount } = await supabase.from('reports').select('*', { count: 'exact', head: true });
-      const { count: adsCount } = await supabase.from('listings').select('*', { count: 'exact', head: true }).eq('is_ad', true);
-      
+      const now = new Date();
+      const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const last14Days = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [
+        { count: totalListings },
+        { count: newListings },
+        { count: prevListings },
+        { count: totalUsers },
+        { count: newUsers },
+        { count: prevUsers },
+        { count: pendingReports },
+        { count: newReports },
+        { count: prevReports },
+        { count: activeAds },
+        { count: newAds },
+        { count: prevAds }
+      ] = await Promise.all([
+        supabase.from('listings').select('*', { count: 'exact', head: true }),
+        supabase.from('listings').select('*', { count: 'exact', head: true }).gte('created_at', last7Days),
+        supabase.from('listings').select('*', { count: 'exact', head: true }).gte('created_at', last14Days).lt('created_at', last7Days),
+        
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', last7Days),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', last14Days).lt('created_at', last7Days),
+        
+        supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending').gte('created_at', last7Days),
+        supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending').gte('created_at', last14Days).lt('created_at', last7Days),
+        
+        supabase.from('listings').select('*', { count: 'exact', head: true }).eq('is_ad', true).eq('status', 'active'),
+        supabase.from('listings').select('*', { count: 'exact', head: true }).eq('is_ad', true).eq('status', 'active').gte('created_at', last7Days),
+        supabase.from('listings').select('*', { count: 'exact', head: true }).eq('is_ad', true).eq('status', 'active').gte('created_at', last14Days).lt('created_at', last7Days)
+      ]);
+
+      const calculateChange = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? `+${current}` : '0%';
+        const change = ((current - previous) / previous) * 100;
+        return `${change >= 0 ? '+' : ''}${change.toFixed(0)}%`;
+      };
+
       return [
-        { label: 'Total Listings', value: (listingsCount || 0).toString(), change: '+12%', icon: 'Package', color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Active Users', value: (usersCount || 0).toString(), change: '+5%', icon: 'Users', color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Pending Reports', value: (reportsCount || 0).toString(), change: '-2%', icon: 'Flag', color: 'text-red-600', bg: 'bg-red-50' },
-        { label: 'Active Ads', value: (adsCount || 0).toString(), change: '+8%', icon: 'BarChart3', color: 'text-purple-600', bg: 'bg-purple-50' }
+        { label: 'Total Listings', value: (totalListings || 0).toString(), change: calculateChange(newListings || 0, prevListings || 0), icon: 'Package', color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Active Users', value: (totalUsers || 0).toString(), change: calculateChange(newUsers || 0, prevUsers || 0), icon: 'Users', color: 'text-green-600', bg: 'bg-green-50' },
+        { label: 'Pending Reports', value: (pendingReports || 0).toString(), change: calculateChange(newReports || 0, prevReports || 0), icon: 'Flag', color: 'text-red-600', bg: 'bg-red-50' },
+        { label: 'Active Ads', value: (activeAds || 0).toString(), change: calculateChange(newAds || 0, prevAds || 0), icon: 'BarChart3', color: 'text-purple-600', bg: 'bg-purple-50' }
       ];
     },
   },
@@ -573,14 +609,46 @@ export const api = {
       return activity.slice(0, 8);
     },
     getChartData: async (): Promise<any[]> => {
-      // Mocking chart data for now as complex aggregation is better done server-side or with more queries
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days.map(day => ({
-        name: day,
-        listings: Math.floor(Math.random() * 50) + 10,
-        users: Math.floor(Math.random() * 20) + 5,
-        reports: Math.floor(Math.random() * 5)
-      }));
+      try {
+        const last7Days = [...Array(7)].map((_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d;
+        });
+
+        const startDate = last7Days[0];
+        startDate.setHours(0, 0, 0, 0);
+
+        const [listings, users, reports] = await Promise.all([
+          supabase.from('listings').select('created_at').gte('created_at', startDate.toISOString()),
+          supabase.from('profiles').select('created_at').gte('created_at', startDate.toISOString()),
+          supabase.from('reports').select('created_at').gte('created_at', startDate.toISOString())
+        ]);
+
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        return last7Days.map(date => {
+          const dateStr = date.toISOString().split('T')[0];
+          const dayName = days[date.getDay()];
+
+          return {
+            name: dayName,
+            listings: (listings.data || []).filter(l => l.created_at.startsWith(dateStr)).length,
+            users: (users.data || []).filter(u => u.created_at.startsWith(dateStr)).length,
+            reports: (reports.data || []).filter(r => r.created_at.startsWith(dateStr)).length
+          };
+        });
+      } catch (error) {
+        console.error('Error fetching chart data:', error);
+        // Fallback to mock data if query fails
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        return days.map(day => ({
+          name: day,
+          listings: 0,
+          users: 0,
+          reports: 0
+        }));
+      }
     }
   },
   users: {
