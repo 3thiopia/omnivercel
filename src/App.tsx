@@ -114,7 +114,7 @@ function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, s
   );
 }
 
-function SellerProfileWrapper({ handleOpenListing, handleStartChat }: any) {
+function SellerProfileWrapper({ handleOpenListing, handleStartChat, user, setIsAuthOpen }: any) {
   const { id } = useParams();
   const navigate = useNavigate();
   if (!id) return <Navigate to="/" />;
@@ -123,8 +123,33 @@ function SellerProfileWrapper({ handleOpenListing, handleStartChat }: any) {
       sellerId={id} 
       onBack={() => navigate(-1)}
       onOpenListing={(listing) => handleOpenListing(listing)}
-      onContact={(sid) => {
-        handleStartChat(sid);
+      onContact={async (sid) => {
+        if (!user) {
+          setIsAuthOpen(true);
+          return;
+        }
+        
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            setIsAuthOpen(true);
+            return;
+          }
+
+          // Create or get conversation
+          const conversation = await api.chats.createConversation(
+            '', // No specific listing when starting from profile
+            sid,
+            session.access_token
+          );
+          
+          if (conversation?.id) {
+            handleStartChat(conversation.id);
+          }
+        } catch (err) {
+          console.error('Error starting chat from profile:', err);
+          toast.error('Failed to start chat. Please try again.');
+        }
       }}
     />
   );
@@ -631,6 +656,10 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => {
+                    if (!user) {
+                      setIsAuthOpen(true);
+                      return;
+                    }
                     navigate('/messages');
                   }}
                   className={`flex items-center gap-2 font-bold transition-colors relative ${activeTab === 'messages' ? 'text-emerald-500' : 'text-gray-500 hover:text-emerald-500'}`}
@@ -728,7 +757,7 @@ export default function App() {
         </div>
       </nav>
     )}
-          <main className={`${location.pathname.startsWith('/messages') ? 'max-w-full px-0' : (viewMode === 'grid' ? 'max-w-7xl px-4' : 'max-w-3xl px-4')} mx-auto transition-all duration-500`}>
+          <main className={`${location.pathname.startsWith('/messages') ? 'max-w-full px-0' : (location.pathname === '/' && viewMode === 'list' ? 'max-w-3xl px-4' : 'max-w-7xl px-4')} mx-auto transition-all duration-500`}>
         <Suspense fallback={
           <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
             <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
@@ -1202,7 +1231,14 @@ export default function App() {
                 setIsAuthOpen={setIsAuthOpen}
               />
             } />
-            <Route path="/seller/:id" element={<SellerProfileWrapper handleOpenListing={handleOpenListing} handleStartChat={handleStartChat} />} />
+            <Route path="/seller/:id" element={
+              <SellerProfileWrapper 
+                handleOpenListing={handleOpenListing} 
+                handleStartChat={handleStartChat} 
+                user={user}
+                setIsAuthOpen={setIsAuthOpen}
+              />
+            } />
             <Route path="/p/:slug" element={<StaticPage />} />
           </Routes>
         </Suspense>
@@ -1269,6 +1305,10 @@ export default function App() {
           handleSellClick();
         }}
         onMessages={() => {
+          if (!user) {
+            setIsAuthOpen(true);
+            return;
+          }
           navigate('/messages');
         }}
         onProfile={() => {

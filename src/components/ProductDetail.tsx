@@ -113,107 +113,99 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     : [product.image];
 
   useEffect(() => {
-    const fetchRelated = async () => {
-      setIsLoadingRelated(true);
-      try {
-        const keywords = product.title
-          .toLowerCase()
-          .replace(/[^\w\s]/g, '')
-          .split(' ')
-          .filter(word => word.length > 3 && !['sale', 'ethiopia', 'addis', 'ababa', 'brand', 'new', 'used', 'slightly'].includes(word))
-          .slice(0, 2)
-          .join(' ');
-
-        // 1. Fetch items from same category with name match (High Relevance)
-        let nameMatchItems: Listing[] = [];
-        if (keywords) {
-          nameMatchItems = await api.listings.getAll({ 
-            category: product.category_id || product.category,
-            search: keywords,
-            status: 'active',
-            limit: 10
-          });
-        }
-
-        // 2. Fetch general items from same category
-        const categoryItems = await api.listings.getAll({ 
-          category: product.category_id || product.category,
-          status: 'active',
-          limit: 20
-        });
-        
-        // 3. Fetch items from same seller
-        let sellerItems: Listing[] = [];
-        if (product.seller_id) {
-          sellerItems = await api.listings.getAll({
-            seller_id: product.seller_id as string,
-            status: 'active',
-            limit: 10
-          });
-        }
-        
-        // Combine and rank: 
-        // 1. Name matches (excluding current)
-        // 2. Seller items (excluding current)
-        // 3. Category items (excluding current)
-        const combined = [...nameMatchItems, ...sellerItems, ...categoryItems];
-        const unique = combined.reduce((acc: Listing[], current) => {
-          const isDuplicate = acc.find(item => item.id === current.id);
-          const isCurrentProduct = String(current.id) === String(product.id);
-          
-          if (!isDuplicate && !isCurrentProduct) {
-            return acc.concat([current]);
-          } else {
-            return acc;
-          }
-        }, []);
-        
-        setRelatedItems(unique);
-      } catch (error) {
-        console.error('Error fetching related items:', error);
-      } finally {
-        setIsLoadingRelated(false);
-      }
-    };
-
-    fetchRelated();
-    
-    const fetchReviews = async () => {
-      if (!product.seller_id) return;
-      setIsLoadingReviews(true);
-      try {
-        const data = await api.reviews.getForSeller(product.seller_id as string);
-        setReviews(data);
-      } catch (error) {
-        console.error('Error fetching reviews:', error);
-      } finally {
-        setIsLoadingReviews(false);
-      }
-    };
-
-    fetchReviews();
-
-    const fetchSellerProfile = async () => {
-      if (!product.seller_id) return;
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', product.seller_id)
-          .single();
-        
-        if (error) throw error;
-        setSellerProfile(data);
-      } catch (error) {
-        console.error('Error fetching seller profile:', error);
-      }
-    };
-
-    fetchSellerProfile();
-
-    // Reset active image when product changes
+    // Reset state immediately for new product
     setActiveImage(product.image);
     setShowAllRelated(false);
+    setRelatedItems([]);
+    setReviews([]);
+    setSellerProfile(null);
+
+    // Pre-fetch main image for faster display
+    const img = new Image();
+    img.src = getOptimizedImageUrl(product.image, { width: 1200, height: 900 });
+
+    const loadAllSecondaryData = async () => {
+      const keywords = product.title
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(' ')
+        .filter(word => word.length > 3 && !['sale', 'ethiopia', 'addis', 'ababa', 'brand', 'new', 'used', 'slightly'].includes(word))
+        .slice(0, 2)
+        .join(' ');
+
+      // Parallelize all secondary data fetching tasks
+      await Promise.all([
+        // Task 1: Fetch Related Items (Parallelized internally)
+        (async () => {
+          setIsLoadingRelated(true);
+          try {
+            const [nameMatchItems, categoryItems, sellerItems] = await Promise.all([
+              keywords ? api.listings.getAll({ 
+                category: product.category_id || product.category,
+                search: keywords,
+                status: 'active',
+                limit: 10
+              }) : Promise.resolve([]),
+              api.listings.getAll({ 
+                category: product.category_id || product.category,
+                status: 'active',
+                limit: 20
+              }),
+              product.seller_id ? api.listings.getAll({
+                seller_id: product.seller_id as string,
+                status: 'active',
+                limit: 10
+              }) : Promise.resolve([])
+            ]);
+
+            const combined = [...nameMatchItems, ...sellerItems, ...categoryItems];
+            const unique = combined.reduce((acc: Listing[], current) => {
+              const isDuplicate = acc.find(item => item.id === current.id);
+              const isCurrentProduct = String(current.id) === String(product.id);
+              if (!isDuplicate && !isCurrentProduct) return acc.concat([current]);
+              return acc;
+            }, []);
+            setRelatedItems(unique);
+          } catch (error) {
+            console.error('Error fetching related items:', error);
+          } finally {
+            setIsLoadingRelated(false);
+          }
+        })(),
+
+        // Task 2: Fetch Reviews
+        (async () => {
+          if (!product.seller_id) return;
+          setIsLoadingReviews(true);
+          try {
+            const data = await api.reviews.getForSeller(product.seller_id as string);
+            setReviews(data);
+          } catch (error) {
+            console.error('Error fetching reviews:', error);
+          } finally {
+            setIsLoadingReviews(false);
+          }
+        })(),
+
+        // Task 3: Fetch Seller Profile
+        (async () => {
+          if (!product.seller_id) return;
+          try {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', product.seller_id)
+              .single();
+            if (error) throw error;
+            setSellerProfile(data);
+          } catch (error) {
+            console.error('Error fetching seller profile:', error);
+          }
+        })()
+      ]);
+    };
+
+    loadAllSecondaryData();
   }, [product.id]);
 
   const handleStatusUpdate = async (status: Listing['status']) => {
@@ -226,7 +218,16 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
     }
   };
 
-  const displayedRelated = showAllRelated ? relatedItems : relatedItems.slice(0, 10);
+  const displayedRelated = useMemo(() => 
+    showAllRelated ? relatedItems : relatedItems.slice(0, 10),
+    [showAllRelated, relatedItems]
+  );
+
+  const relatedSectionTitle = useMemo(() => {
+    const firstWord = product.title.split(' ')[0].toLowerCase();
+    const hasSimilar = relatedItems.some(item => item.title.toLowerCase().includes(firstWord));
+    return hasSimilar ? `More like this ${product.title.split(' ')[0]}` : 'Related Products';
+  }, [relatedItems, product.title]);
 
   const handleStartChat = async () => {
     try {
@@ -426,41 +427,25 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         type="product"
         schema={productSchema}
       />
-      {/* Header - Floating/Sticky */}
-      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between h-14 sm:h-16 ${
-        isScrolled 
-          ? 'bg-white/80 backdrop-blur-xl border-b border-gray-100 py-3' 
-          : 'bg-transparent pt-3 lg:pt-8 pb-3'
-      }`}>
+      {/* Header - Sticky */}
+      <div className={`sticky top-0 left-0 right-0 z-50 transition-all duration-300 px-4 flex items-center justify-between h-14 sm:h-16 bg-white border-b border-gray-100 shadow-sm mb-4`}>
         <button 
           onClick={onBack}
-          className={`p-2.5 rounded-full transition-all active:scale-90 ${
-            isScrolled 
-              ? 'bg-gray-100 text-gray-900' 
-              : 'bg-black/20 backdrop-blur-md text-white'
-          }`}
+          className="p-2.5 rounded-full transition-all active:scale-90 bg-gray-100 text-gray-900 hover:bg-gray-200"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
         <div className="flex gap-2.5">
           <button 
             onClick={() => setIsShareModalOpen(true)}
-            className={`p-2.5 rounded-full transition-all active:scale-90 ${
-              isScrolled 
-                ? 'bg-gray-100 text-gray-600' 
-                : 'bg-black/20 backdrop-blur-md text-white'
-            }`}
+            className="p-2.5 rounded-full transition-all active:scale-90 bg-gray-100 text-gray-600 hover:text-emerald-600"
           >
             <Share2 className="w-5 h-5" />
           </button>
           <button 
             onClick={() => onFavorite?.(product.id)}
             className={`p-2.5 rounded-full transition-all flex items-center gap-1.5 active:scale-90 ${
-              isScrolled 
-                ? (product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600 hover:text-red-500') 
-                : (product.isFavorited 
-                    ? 'bg-red-50 text-red-500' 
-                    : 'bg-black/20 backdrop-blur-md text-white hover:text-red-500')
+              product.isFavorited ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600 hover:text-red-500'
             }`}
           >
             <Heart className={`w-5 h-5 ${product.isFavorited ? 'fill-current' : ''}`} />
@@ -1305,9 +1290,7 @@ export const ProductDetail = ({ product, onBack, onViewProduct, onStartChat, onE
         <div className="flex items-end justify-between mb-8">
           <div>
             <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight break-all sm:break-words lg:break-normal">
-              {relatedItems.some(item => item.title.toLowerCase().includes(product.title.split(' ')[0].toLowerCase())) 
-                ? `More like this ${product.title.split(' ')[0]}` 
-                : 'Related Products'}
+              {relatedSectionTitle}
             </h2>
             <p className="text-gray-500 font-medium">Similar items in {product.category_data?.name || product.category}</p>
           </div>

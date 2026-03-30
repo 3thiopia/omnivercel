@@ -20,9 +20,7 @@ export const LazyImage = ({
   const [isInView, setIsInView] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [processedSrc, setProcessedSrc] = useState<string | undefined>(undefined);
   const imgRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -41,56 +39,6 @@ export const LazyImage = ({
 
     return () => observer.disconnect();
   }, [src]);
-
-  useEffect(() => {
-    if (!isInView || !src || !withWatermark) {
-      setProcessedSrc(src);
-      return;
-    }
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = src;
-
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        setProcessedSrc(src);
-        return;
-      }
-
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-
-      const fontSize = Math.max(20, Math.floor(img.width / 15));
-      ctx.font = `900 ${fontSize}px "Inter", sans-serif`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-
-      const padding = fontSize / 2;
-      ctx.fillText("Omni Market", img.width - padding, img.height - padding);
-
-      try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        setProcessedSrc(dataUrl);
-      } catch (err) {
-        console.error("Watermarking failed:", err);
-        setProcessedSrc(src);
-      }
-    };
-
-    img.onerror = () => {
-      setProcessedSrc(src);
-    };
-  }, [isInView, src, withWatermark]);
 
   const handleError = () => {
     setHasError(true);
@@ -122,17 +70,26 @@ export const LazyImage = ({
           <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">No Image</span>
         </div>
       ) : (
-        isInView && processedSrc && (
-          <img
-            src={processedSrc}
-            alt={alt}
-            onLoad={handleLoad}
-            onError={handleError}
-            className={`w-full h-full object-cover transition-all duration-700 ease-out ${
-              isLoading ? 'opacity-0 scale-105 blur-lg' : 'opacity-100 scale-100 blur-0'
-            }`}
-            {...props}
-          />
+        isInView && src && (
+          <>
+            <img
+              src={src}
+              alt={alt}
+              onLoad={handleLoad}
+              onError={handleError}
+              className={`w-full h-full object-cover transition-all duration-700 ease-out ${
+                isLoading ? 'opacity-0 scale-105 blur-lg' : 'opacity-100 scale-100 blur-0'
+              }`}
+              {...props}
+            />
+            {withWatermark && !isLoading && (
+              <div className="absolute bottom-2 right-2 pointer-events-none select-none">
+                <span className="text-[10px] sm:text-xs font-black text-white/40 uppercase tracking-widest drop-shadow-sm">
+                  Omni Market
+                </span>
+              </div>
+            )}
+          </>
         )
       )}
     </div>

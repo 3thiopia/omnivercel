@@ -62,6 +62,11 @@ export const ListingCard = React.memo(({ title, price, location, image, category
               TOP
             </div>
           )}
+          {is_ad && (
+            <div className="absolute top-3 right-3 bg-gray-900/80 backdrop-blur-sm text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter z-10">
+              Ad
+            </div>
+          )}
         </div>
         <div className="p-2 sm:p-4 flex flex-col flex-1 min-h-0">
           <div className="h-[12px] sm:h-[16px] mb-0.5 sm:mb-1 overflow-hidden">
@@ -81,17 +86,12 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 e.stopPropagation();
                 onFavorite?.(e);
               }}
-              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+              className={`flex items-center gap-1 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
             >
-              <div className="flex items-center gap-1">
-                {likesCount !== undefined && likesCount > 0 && (
-                  <span className="text-[10px] font-black">{likesCount}</span>
-                )}
-                <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
-              </div>
-              {is_ad && (
-                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
+              {likesCount !== undefined && likesCount > 0 && (
+                <span className="text-[10px] font-black">{likesCount}</span>
               )}
+              <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
             </button>
           </div>
           <div className="flex flex-col gap-0.5 sm:gap-1 mt-1 sm:mt-2">
@@ -144,6 +144,11 @@ export const ListingCard = React.memo(({ title, price, location, image, category
             TOP
           </div>
         )}
+        {is_ad && (
+          <div className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-sm text-white text-[7px] font-black px-1 py-0.5 rounded uppercase tracking-tighter z-10">
+            Ad
+          </div>
+        )}
       </div>
       <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1 min-w-0">
         <div>
@@ -162,17 +167,12 @@ export const ListingCard = React.memo(({ title, price, location, image, category
                 e.stopPropagation();
                 onFavorite?.(e);
               }}
-              className={`flex flex-col items-center gap-0.5 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
+              className={`flex items-center gap-1 transition-all ${isFavorited ? 'text-red-500' : 'text-gray-300 hover:text-red-500'}`}
             >
-              <div className="flex items-center gap-1">
-                {likesCount !== undefined && likesCount > 0 && (
-                  <span className="text-[10px] sm:text-xs font-black">{likesCount}</span>
-                )}
-                <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
-              </div>
-              {is_ad && (
-                <span className="text-[8px] font-black bg-gray-900 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">Ad</span>
+              {likesCount !== undefined && likesCount > 0 && (
+                <span className="text-[10px] sm:text-xs font-black">{likesCount}</span>
               )}
+              <Heart className={`w-4 h-4 sm:w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 sm:mt-2">

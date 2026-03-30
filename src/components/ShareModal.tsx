@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Copy, Send, MessageCircle, Facebook, Share2, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
 interface ShareModalProps {
@@ -12,6 +12,16 @@ interface ShareModalProps {
 
 export const ShareModal = ({ isOpen, onClose, title, url }: ShareModalProps) => {
   const [copied, setCopied] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const shareOptions = [
     {
@@ -66,10 +76,16 @@ export const ShareModal = ({ isOpen, onClose, title, url }: ShareModalProps) => 
     }
   };
 
+  const modalVariants = {
+    hidden: isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95, y: 20 },
+    visible: isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 },
+    exit: isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95, y: 20 }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center px-0 md:px-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -78,20 +94,35 @@ export const ShareModal = ({ isOpen, onClose, title, url }: ShareModalProps) => 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className={`relative w-full md:max-w-sm bg-white shadow-2xl overflow-hidden ${
+              isMobile 
+                ? 'rounded-t-[2.5rem] pb-safe-area-inset-bottom' 
+                : 'rounded-3xl'
+            }`}
           >
+            {/* Drag Handle for Mobile */}
+            {isMobile && (
+              <div className="flex justify-center pt-4 pb-2">
+                <div className="w-12 h-1.5 bg-gray-200 rounded-full" />
+              </div>
+            )}
+
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">Share listing</h3>
-                <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
+                {!isMobile && (
+                  <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-4 mb-8">
@@ -123,10 +154,19 @@ export const ShareModal = ({ isOpen, onClose, title, url }: ShareModalProps) => 
                 {!!navigator.share && (
                   <button
                     onClick={handleWebShare}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-2xl font-semibold hover:bg-gray-800 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
-                    <Share2 className="w-4 h-4" />
-                    More options
+                    <Share2 className="w-5 h-5" />
+                    System Share
+                  </button>
+                )}
+
+                {isMobile && (
+                  <button
+                    onClick={onClose}
+                    className="w-full py-4 mt-2 bg-gray-100 text-gray-900 rounded-2xl font-bold hover:bg-gray-200 transition-all active:scale-95"
+                  >
+                    Cancel
                   </button>
                 )}
               </div>

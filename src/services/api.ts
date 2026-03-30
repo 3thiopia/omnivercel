@@ -345,20 +345,25 @@ export const api = {
       return mappedData;
     },
     getById: async (id: string | number, _token?: string): Promise<Listing | null> => {
-      const { data, error } = await supabase
-        .from('listings')
-        .select(`
-          *,
-          category_data:categories(name, icon),
-          profiles(full_name),
-          listing_images(image_url)
-        `)
-        .eq('id', id)
-        .single();
+      const [listingResult, sessionResult] = await Promise.all([
+        supabase
+          .from('listings')
+          .select(`
+            *,
+            category_data:categories(name, icon),
+            profiles(full_name),
+            listing_images(image_url)
+          `)
+          .eq('id', id)
+          .single(),
+        supabase.auth.getSession()
+      ]);
+
+      const { data, error } = listingResult;
+      const { data: { session } } = sessionResult;
 
       if (error || !data) return null;
 
-      const { data: { session } } = await supabase.auth.getSession();
       let isFavorited = false;
       if (session?.user) {
         const { data: fav } = await supabase
