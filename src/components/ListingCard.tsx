@@ -47,7 +47,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         onClick={onClick}
-        className="bg-white rounded-2xl overflow-hidden border border-gray-100/50 shadow-sm hover:shadow-xl transition-all group cursor-pointer relative h-full flex flex-col"
+        className={`bg-white rounded-2xl overflow-hidden border ${isPromoted ? 'border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)]' : 'border-gray-100/50 shadow-sm'} hover:shadow-xl transition-all group cursor-pointer relative h-full flex flex-col`}
       >
         <div className="relative aspect-[4/3] overflow-hidden">
           <LazyImage 
@@ -129,7 +129,7 @@ export const ListingCard = React.memo(({ title, price, location, image, category
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true }}
       onClick={onClick}
-      className="bg-white rounded-2xl overflow-hidden border border-gray-100/50 shadow-sm hover:shadow-md transition-all group cursor-pointer flex h-36 sm:h-40"
+      className={`bg-white rounded-2xl overflow-hidden border ${isPromoted ? 'border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)]' : 'border-gray-100/50 shadow-sm'} hover:shadow-md transition-all group cursor-pointer flex h-36 sm:h-40`}
     >
       <div className="relative w-32 sm:w-48 overflow-hidden flex-shrink-0">
         <LazyImage 

@@ -14,6 +14,9 @@
     color: #1f2937 !important; /* text-gray-800 */
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
   }
 
   /* Force white backgrounds for cards and sections */

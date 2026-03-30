@@ -413,7 +413,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-lg font-black text-gray-900 tracking-tight">
+          <h1 className="text-lg font-black text-gray-900 tracking-tight truncate max-w-[200px]">
             {selectedConversation ? selectedConversation.other_user?.full_name : 'Messages'}
           </h1>
         </div>
@@ -578,7 +578,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 no-scrollbar bg-gray-50/30">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-4 no-scrollbar bg-gray-50/30">
               {isMessagesLoading ? (
                 <div className="flex justify-center py-10">
                   <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
@@ -608,7 +608,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.2 }}
-                        className={`flex group gap-3 ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
+                        className={`flex w-full group gap-3 ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-6' : 'mt-1'}`}
                       >
                         {!isMe && (
                           <div className="w-8 h-8 flex-shrink-0 self-end mb-1">
@@ -628,7 +628,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                           </div>
                         )}
 
-                        <div className={`relative max-w-[75%] px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
+                        <div className={`relative max-w-[85%] sm:max-w-[75%] min-w-0 px-4 py-3 text-sm font-medium transition-all duration-200 shadow-sm ${
                           isMe 
                             ? `bg-emerald-500 text-white ${
                                 isFirstInGroup && isLastInGroup ? 'rounded-[1.5rem] rounded-tr-none' :
@@ -644,7 +644,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                               }`
                         }`}>
                           {msg.image_url && (
-                            <div className="mb-2 rounded-xl overflow-hidden border border-black/5 bg-gray-50 max-w-[300px]">
+                            <div className="mb-2 rounded-xl overflow-hidden border border-black/5 bg-gray-50 max-w-full">
                               <img 
                                 src={getOptimizedImageUrl(msg.image_url, { width: 600, height: 450 })} 
                                 alt="Attachment" 
@@ -655,8 +655,8 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                             </div>
                           )}
                           {msg.content.includes('[PRODUCT_IMAGE]') ? (
-                            <div className="space-y-2">
-                              <p>{msg.content.split('[PRODUCT_IMAGE]')[0]}</p>
+                            <div className="space-y-2 min-w-0">
+                              <p className="break-all">{msg.content.split('[PRODUCT_IMAGE]')[0]}</p>
                               <div className="rounded-xl overflow-hidden border border-black/5 bg-gray-50">
                                 <img 
                                   src={getOptimizedImageUrl(msg.content.split('[PRODUCT_IMAGE]')[1], { width: 400, height: 300 })} 
@@ -667,7 +667,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                               </div>
                             </div>
                           ) : (
-                            <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                            <p className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] leading-relaxed">{msg.content}</p>
                           )}
                           <div className={`flex items-center justify-between gap-4 mt-1.5 ${!isLastInGroup && 'hidden group-hover:flex'}`}>
                             <div className="flex items-center gap-1.5">

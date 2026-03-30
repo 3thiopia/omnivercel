@@ -275,14 +275,17 @@ export default function App() {
   }, [listingsData]);
 
   const processedListings = useMemo(() => {
-    if (viewMode === 'list') return listings;
-    
     const regularListings = listings.filter(l => !l.is_ad);
     const ads = listings.filter(l => l.is_ad);
     
     if (ads.length === 0) return listings;
     
     const result = [...regularListings];
+    const overflowAds: Listing[] = [];
+    
+    // In list mode, we treat it as 1 column
+    const effectiveColumns = viewMode === 'list' ? 1 : columns;
+    
     // Sort ads by row then col to ensure consistent injection
     const sortedAds = [...ads].sort((a, b) => {
       const rowA = a.ad_row || 0;
@@ -294,15 +297,25 @@ export default function App() {
     });
     
     sortedAds.forEach(ad => {
-      if (ad.ad_row && ad.ad_col) {
-        const index = (ad.ad_row - 1) * columns + (ad.ad_col - 1);
+      if (ad.ad_row && (viewMode === 'list' || ad.ad_col)) {
+        // In list mode, we ignore ad_col and use 1
+        const col = viewMode === 'list' ? 1 : (ad.ad_col || 1);
+        const index = (ad.ad_row - 1) * effectiveColumns + (col - 1);
+        
         if (index >= 0 && index <= result.length) {
           result.splice(index, 0, ad);
+        } else {
+          // If the designated spot is out of bounds (e.g. due to filtering),
+          // move it to the top of the list.
+          overflowAds.push(ad);
         }
+      } else {
+        // Ads without specific positioning also go to the top
+        overflowAds.push(ad);
       }
     });
     
-    return result;
+    return [...overflowAds, ...result];
   }, [listings, columns, viewMode]);
 
   useEffect(() => {
@@ -757,7 +770,7 @@ export default function App() {
         </div>
       </nav>
     )}
-          <main className={`${location.pathname.startsWith('/messages') ? 'max-w-full px-0' : (location.pathname === '/' && viewMode === 'list' ? 'max-w-3xl px-4' : 'max-w-7xl px-4')} mx-auto transition-all duration-500`}>
+          <main className={`${location.pathname.startsWith('/messages') ? 'max-w-full px-0 overflow-x-hidden' : (location.pathname === '/' && viewMode === 'list' ? 'max-w-3xl px-4 transition-all duration-500' : 'max-w-7xl px-4 transition-all duration-500')} mx-auto`}>
         <Suspense fallback={
           <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
             <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
