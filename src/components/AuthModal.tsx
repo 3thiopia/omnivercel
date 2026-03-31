@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Mail, Lock, User, LogIn, UserPlus, AlertCircle, MapPin, Phone } from 'lucide-react';
+import { X, Mail, Lock, User, LogIn, UserPlus, AlertCircle, MapPin, Phone, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { ETHIOPIAN_LOCATIONS } from '../constants/locations';
@@ -186,6 +186,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                           <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                           <input
                             type="text"
+                            name="name"
+                            autoComplete="name"
                             required
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
@@ -201,6 +203,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                           <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                           <input
                             type="tel"
+                            name="tel"
+                            autoComplete="tel"
                             required
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
@@ -273,6 +277,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                       <input
                         type="email"
+                        name="email"
+                        autoComplete="username"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -306,20 +312,48 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                   )}
 
                   {(!isLogin || authMethod === 'password') && (
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
-                      <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                        <input
-                          type="password"
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-base sm:text-sm"
-                          placeholder="••••••••"
-                        />
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                        <div className="relative group">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                          <input
+                            type="password"
+                            name="password"
+                            autoComplete={isLogin ? "current-password" : "new-password"}
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-gray-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-base sm:text-sm"
+                            placeholder="••••••••"
+                          />
+                        </div>
                       </div>
-                    </div>
+                      
+                      {isLogin && (
+                        <div className="flex items-center justify-between px-1">
+                          <label className="flex items-center gap-2 cursor-pointer group">
+                            <div className="relative flex items-center">
+                              <input 
+                                type="checkbox" 
+                                className="peer sr-only" 
+                                defaultChecked 
+                              />
+                              <div className="w-5 h-5 border-2 border-gray-200 rounded-lg peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all"></div>
+                              <Check className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity left-0.5" />
+                            </div>
+                            <span className="text-xs font-bold text-gray-500 group-hover:text-gray-700 transition-colors">Remember me</span>
+                          </label>
+                          <button 
+                            type="button"
+                            className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+                            onClick={() => toast.error('Password reset is coming soon!')}
+                          >
+                            Forgot Password?
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <button

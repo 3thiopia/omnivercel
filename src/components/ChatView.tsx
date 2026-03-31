@@ -55,6 +55,7 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -650,18 +651,18 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
                                 alt="Attachment" 
                                 className="w-full h-auto object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
                                 referrerPolicy="no-referrer"
-                                onClick={() => window.open(msg.image_url, '_blank')}
+                                onClick={() => setViewerImage(msg.image_url || null)}
                               />
                             </div>
                           )}
                           {msg.content.includes('[PRODUCT_IMAGE]') ? (
                             <div className="space-y-2 min-w-0">
                               <p className="break-all">{msg.content.split('[PRODUCT_IMAGE]')[0]}</p>
-                              <div className="rounded-xl overflow-hidden border border-black/5 bg-gray-50">
+                              <div className="rounded-xl overflow-hidden border border-black/5 bg-gray-50 cursor-pointer" onClick={() => setViewerImage(msg.content.split('[PRODUCT_IMAGE]')[1])}>
                                 <img 
                                   src={getOptimizedImageUrl(msg.content.split('[PRODUCT_IMAGE]')[1], { width: 400, height: 300 })} 
                                   alt="Product" 
-                                  className="w-full h-auto object-cover"
+                                  className="w-full h-auto object-cover hover:scale-105 transition-transform duration-300"
                                   referrerPolicy="no-referrer"
                                 />
                               </div>
@@ -790,6 +791,43 @@ export const ChatView = ({ initialConversationId, onConversationSelected, onBack
         )}
       </div>
       </div>
+
+      {/* Image Viewer Modal */}
+      <AnimatePresence>
+        {viewerImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-10"
+            onClick={() => setViewerImage(null)}
+          >
+            <motion.button
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="absolute top-6 right-6 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all z-10"
+              onClick={() => setViewerImage(null)}
+            >
+              <X className="w-6 h-6" />
+            </motion.button>
+            
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative max-w-7xl max-h-full w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={viewerImage} 
+                alt="Full view" 
+                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+                referrerPolicy="no-referrer"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
