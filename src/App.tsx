@@ -19,6 +19,7 @@ import { ProfileCompletionModal } from './components/ProfileCompletionModal';
 import { VirtualListingGrid } from './components/VirtualListingGrid';
 import { ListingSkeleton } from './components/ui/Skeleton';
 import { Meta } from './components/Meta';
+import { StaticPage } from './components/StaticPage';
 import { useAnalytics } from './hooks/useAnalytics';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { NoConnection } from './components/NoConnection';
@@ -31,7 +32,6 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m =
 const MyListings = lazy(() => import('./components/MyListings').then(m => ({ default: m.MyListings })));
 const ProfileView = lazy(() => import('./components/ProfileView').then(m => ({ default: m.ProfileView })));
 const ChatView = lazy(() => import('./components/ChatView').then(m => ({ default: m.ChatView })));
-const StaticPage = lazy(() => import('./components/StaticPage').then(m => ({ default: m.StaticPage })));
 const SellerProfileView = lazy(() => import('./components/SellerProfileView').then(m => ({ default: m.SellerProfileView })));
 
 function ListingDetailWrapper({ onOpenListing, onStartChat, setEditingListing, setIsPostAdOpen, handleDeleteListing, handleUpdateListingStatus, handleToggleFavorite, handleViewSellerProfile, setIsAuthOpen }: any) {
